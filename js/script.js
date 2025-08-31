@@ -11,8 +11,10 @@
       if (user) {
         // User is signed in
         console.log('User signed in:', user.displayName);
-        document.getElementById('loginBtn').textContent = `Hi, ${user.displayName}`;
-        document.getElementById('loginBtn').onclick = () => auth.signOut();
+        document.getElementById('loginBtn').textContent = truncateName(user.displayName);
+        document.getElementById('loginBtn').onclick = () => {
+          document.getElementById('userModal').style.display = 'flex';
+        };
         // Load user data
         loadUserData(user.uid);
       } else {
@@ -73,110 +75,17 @@
     const LS_HISTORY = "GYM_HISTORY_V1";
     const LS_ACTIVE  = "GYM_ACTIVE_WORKOUT_V1";
 
-    const WORKOUT_TEMPLATES = [
-      {
-        id: "push-day",
-        name: "Push Day (Chest/Shoulders/Triceps)",
-        muscles: ["Chest","Shoulders","Arms"],
-        exercises: [
-          { name:"Barbell Bench Press", muscle:"Chest", defaultSets:3, defaultReps:10 },
-          { name:"Overhead Press", muscle:"Shoulders", defaultSets:3, defaultReps:10 },
-          { name:"Incline Dumbbell Press", muscle:"Chest", defaultSets:3, defaultReps:10 },
-          { name:"Lateral Raises", muscle:"Shoulders", defaultSets:3, defaultReps:12 },
-          { name:"Triceps Pushdown", muscle:"Arms", defaultSets:3, defaultReps:12 }
-        ]
-      },
-      {
-        id: "pull-day",
-        name: "Pull Day (Back/Biceps)",
-        muscles: ["Back","Arms","Shoulders"],
-        exercises: [
-          { name:"Deadlift", muscle:"Back", defaultSets:3, defaultReps:5 },
-          { name:"Barbell Row", muscle:"Back", defaultSets:3, defaultReps:8 },
-          { name:"Lat Pulldown", muscle:"Back", defaultSets:3, defaultReps:10 },
-          { name:"Face Pull", muscle:"Shoulders", defaultSets:3, defaultReps:12 },
-          { name:"Barbell Curl", muscle:"Arms", defaultSets:3, defaultReps:10 }
-        ]
-      },
-      {
-        id: "leg-day",
-        name: "Leg Day (Quads/Glutes/Hamstrings)",
-        muscles: ["Legs","Core"],
-        exercises: [
-          { name:"Back Squat", muscle:"Legs", defaultSets:4, defaultReps:8 },
-          { name:"Romanian Deadlift", muscle:"Legs", defaultSets:3, defaultReps:8 },
-          { name:"Leg Press", muscle:"Legs", defaultSets:3, defaultReps:10 },
-          { name:"Leg Extension", muscle:"Legs", defaultSets:2, defaultReps:12 },
-          { name:"Standing Calf Raise", muscle:"Legs", defaultSets:3, defaultReps:15 },
-          { name:"Ab Wheel", muscle:"Core", defaultSets:2, defaultReps:10 }
-        ]
-      },
-      {
-        id: "full-body",
-        name: "Full Body (Classic)",
-        muscles: ["Full Body","Legs","Chest","Back"],
-        exercises: [
-          { name:"Back Squat", muscle:"Legs", defaultSets:3, defaultReps:8 },
-          { name:"Bench Press", muscle:"Chest", defaultSets:3, defaultReps:10 },
-          { name:"Barbell Row", muscle:"Back", defaultSets:3, defaultReps:8 }
-        ]
-      },
-      {
-        id: "upper-body",
-        name: "Upper Body",
-        muscles: ["Chest","Back","Shoulders","Arms"],
-        exercises: [
-          { name:"Bench Press", muscle:"Chest", defaultSets:3, defaultReps:10 },
-          { name:"Overhead Press", muscle:"Shoulders", defaultSets:3, defaultReps:10 },
-          { name:"Pull-ups", muscle:"Back", defaultSets:3, defaultReps:8 },
-          { name:"Seated Row", muscle:"Back", defaultSets:3, defaultReps:10 },
-          { name:"EZ Bar Curl", muscle:"Arms", defaultSets:2, defaultReps:10 },
-          { name:"Dips", muscle:"Arms", defaultSets:2, defaultReps:10 }
-        ]
-      },
-      {
-        id: "lower-body",
-        name: "Lower Body",
-        muscles: ["Legs","Core"],
-        exercises: [
-          { name:"Back Squat", muscle:"Legs", defaultSets:4, defaultReps:8 },
-          { name:"Conventional Deadlift", muscle:"Legs", defaultSets:3, defaultReps:5 },
-          { name:"Walking Lunges", muscle:"Legs", defaultSets:2, defaultReps:10 },
-          { name:"Hamstring Curl", muscle:"Legs", defaultSets:2, defaultReps:12 },
-          { name:"Seated Calf Raise", muscle:"Legs", defaultSets:3, defaultReps:15 }
-        ]
-      },
-      {
-        id: "chest-focus",
-        name: "Chest Focus",
-        muscles: ["Chest","Arms","Shoulders"],
-        exercises: [
-          { name:"Flat DB Press", muscle:"Chest", defaultSets:3, defaultReps:10 },
-          { name:"Incline Bench Press", muscle:"Chest", defaultSets:3, defaultReps:10 },
-          { name:"Cable Fly", muscle:"Chest", defaultSets:3, defaultReps:12 },
-          { name:"Dips", muscle:"Arms", defaultSets:2, defaultReps:10 },
-          { name:"Front Raises", muscle:"Shoulders", defaultSets:2, defaultReps:12 }
-        ]
-      },
-      {
-        id: "back-focus",
-        name: "Back Focus",
-        muscles: ["Back","Arms","Shoulders"],
-        exercises: [
-          { name:"Deadlift", muscle:"Back", defaultSets:3, defaultReps:5 },
-          { name:"Weighted Pull-ups", muscle:"Back", defaultSets:3, defaultReps:8 },
-          { name:"Chest Supported Row", muscle:"Back", defaultSets:3, defaultReps:10 },
-          { name:"Straight Arm Pulldown", muscle:"Back", defaultSets:2, defaultReps:12 },
-          { name:"Dumbbell Shrugs", muscle:"Shoulders", defaultSets:2, defaultReps:12 }
-        ]
-      }
-    ];
+    function truncateName(name, maxLen = 12) {
+      return name.length > maxLen ? name.substring(0, maxLen) + '...' : name;
+    }
+
 
     // ===== State =====
     let activeTab = "library"; // "library" | "workout" | "calendar"
     let history = [];
     let activeWorkout = null;
     let calendarCursor = new Date(); // month being viewed
+    let workoutTimerInterval = null;
 
     // ===== Utilities =====
     function loadHistory(){
@@ -247,6 +156,18 @@
       return count;
     }
 
+    function startWorkoutTimer(){
+      if(workoutTimerInterval) clearInterval(workoutTimerInterval);
+      workoutTimerInterval = setInterval(() => {
+        if(!activeWorkout) return;
+        const elapsed = Math.floor((new Date() - new Date(activeWorkout.startTime)) / 1000);
+        const min = Math.floor(elapsed / 60);
+        const sec = elapsed % 60;
+        const timerEl = document.getElementById('workoutTimer');
+        if(timerEl) timerEl.textContent = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+      }, 1000);
+    }
+
     // ===== Tabs =====
     function setTab(name){
       activeTab = name;
@@ -263,6 +184,8 @@
       if(name === "library") renderLibrary();
       if(name === "workout") renderWorkout();
       if(name === "calendar") { renderCalendar(); renderDayDetails(null); }
+
+      updateResumeChip();
     }
 
     // ===== Exercise Library Rendering =====
@@ -341,6 +264,7 @@
         exercises: t.exercises.map(ex => ({
           name: ex.name,
           muscle: ex.muscle,
+          exercise_link: ex.exercise_link,
           sets: Array.from({ length: ex.defaultSets }, () => ({
             weight: 0,
             reps: ex.defaultReps,
@@ -350,6 +274,7 @@
       };
       saveActiveWorkout();
       updateResumeChip();
+      startWorkoutTimer();
       setTab("workout");
       showToast("Workout started");
     }
@@ -372,11 +297,13 @@
           </div>
         `;
         actions.style.display = "none";
+        clearInterval(workoutTimerInterval);
         wrap.querySelector("#gotoLibraryBtn2")?.addEventListener("click", () => setTab("library"));
         return;
       }
 
       actions.style.display = "flex";
+      startWorkoutTimer();
       const totalSets = activeWorkout.exercises.reduce((a,e)=>a+(e.sets?.length||0),0);
       const doneSets = countCompletedSets(activeWorkout);
 
@@ -398,8 +325,15 @@
           <div class="exercise" data-ex="${ei}">
             <div class="row">
               <div>
-                <div class="name">${ex.name}</div>
-                <div class="muscle">${ex.muscle}</div>
+                <div style="display:flex; align-items:center; gap:8px">
+                  <button class="exercise-link-btn" data-link="${ex.exercise_link || '#'}" title="View Exercise Demo">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M8 5v14l11-7z"/></svg>
+                  </button>
+                  <div>
+                    <div class="name">${ex.name}</div>
+                    <div class="muscle">${ex.muscle}</div>
+                  </div>
+                </div>
               </div>
               <div style="display:flex; gap:8px">
                 <button class="btn secondary" data-add-set="${ei}">
@@ -434,7 +368,25 @@
       html += `</div>`;
       wrap.innerHTML = html;
 
-      // Bind events
+      // Bind events for exercise link buttons
+      wrap.querySelectorAll('.exercise-link-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const link = this.getAttribute('data-link');
+          if (link && link !== '#') {
+            window.open(link, '_blank');
+          } else {
+            // Google the exercise name
+            const exerciseEl = this.closest('.exercise');
+            const ei = Number(exerciseEl.getAttribute('data-ex'));
+            const ex = activeWorkout.exercises[ei];
+            const query = encodeURIComponent(ex.name + ' exercise');
+            window.open(`https://www.google.com/search?q=${query}`, '_blank');
+          }
+        });
+      });
+
       wrap.querySelectorAll("[data-add-set]").forEach(btn=>{
         btn.addEventListener("click", e=>{
           const ei = Number(btn.getAttribute("data-add-set"));
@@ -454,7 +406,7 @@
       });
 
       // Actions
-      document.getElementById("finishWorkoutBtn").disabled = doneSets === 0;
+      document.getElementById("finishWorkoutBtn").disabled = doneSets < totalSets;
     }
 
     function onSetInput(e){
@@ -531,19 +483,25 @@
       activeWorkout = null;
       saveActiveWorkout();
       updateResumeChip();
+      clearInterval(workoutTimerInterval);
       renderWorkout();
       showToast("Workout discarded", "warn");
     }
 
     function finishWorkout(){
       if(!activeWorkout) return;
+      const totalSets = activeWorkout.exercises.reduce((a,e)=>a+(e.sets?.length||0),0);
       const totalDone = countCompletedSets(activeWorkout);
-      if(totalDone === 0){
-        showToast("Mark at least one set complete before finishing", "warn");
+      if(totalDone < totalSets){
+        // Show warning modal
+        document.getElementById('incompleteModal').style.display = 'flex';
         return;
       }
-      const ok = confirm("Finish workout and save to calendar?");
-      if(!ok) return;
+      proceedFinishWorkout();
+    }
+    
+    function proceedFinishWorkout(){
+      if(!activeWorkout) return;
 
       const endTime = new Date().toISOString();
       // Build compact summary to store
@@ -572,6 +530,7 @@
       activeWorkout = null;
       saveActiveWorkout();
       updateResumeChip();
+      clearInterval(workoutTimerInterval);
 
       setTab("calendar");
       renderCalendar();
@@ -582,9 +541,9 @@
     }
 
     function updateResumeChip(){
-      const chip = document.getElementById("resumeChip");
-      if(activeWorkout){
-        chip.style.display = "inline-flex";
+      const chip = document.getElementById("floatingResume");
+      if(activeWorkout && activeTab !== "workout"){
+        chip.style.display = "block";
       }else{
         chip.style.display = "none";
       }
@@ -690,6 +649,17 @@
       box.hidden = false;
     }
 
+    function removeIncompleteSets(){
+      if(!activeWorkout) return;
+      activeWorkout.exercises.forEach(ex => {
+        if(ex.sets){
+          ex.sets = ex.sets.filter(s => s.completed);
+        }
+      });
+      saveActiveWorkout();
+      renderWorkout();
+    }
+
     // ===== Event Bindings and Initialization =====
     function bindEvents(){
       // Tabs
@@ -697,8 +667,30 @@
       document.getElementById("tab-workout").addEventListener("click", () => setTab("workout"));
       document.getElementById("tab-calendar").addEventListener("click", () => setTab("calendar"));
 
-      // Resume chip
-      document.getElementById("resumeChip").addEventListener("click", () => setTab("workout"));
+      // User modal
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut();
+        document.getElementById('userModal').style.display = 'none';
+      });
+      document.getElementById('backBtn').addEventListener('click', () => {
+        document.getElementById('userModal').style.display = 'none';
+      });
+
+      // Incomplete sets modal
+      document.getElementById('continueWorkoutBtn').addEventListener('click', () => {
+        document.getElementById('incompleteModal').style.display = 'none';
+      });
+      document.getElementById('removeIncompleteBtn').addEventListener('click', () => {
+        removeIncompleteSets();
+        document.getElementById('incompleteModal').style.display = 'none';
+        // Small delay to allow UI update
+        setTimeout(() => {
+          proceedFinishWorkout();
+        }, 100);
+      });
+
+      // Floating resume
+      document.getElementById("floatingResume").addEventListener("click", () => setTab("workout"));
 
       // Workout persistent actions
       document.getElementById("finishWorkoutBtn").addEventListener("click", finishWorkout);
@@ -759,12 +751,23 @@
     }
 
     function init(){
-      updateResumeChip();
-      renderLibrary();
-      renderCalendar();
-      renderDayDetails(null);
-      bindEvents();
-    }
+       updateResumeChip();
+       renderLibrary();
+       renderCalendar();
+       renderDayDetails(null);
+       bindEvents();
+
+       // Register service worker
+       if ('serviceWorker' in navigator) {
+         navigator.serviceWorker.register('/sw.js')
+           .then((registration) => {
+             console.log('Service Worker registered with scope:', registration.scope);
+           })
+           .catch((error) => {
+             console.log('Service Worker registration failed:', error);
+           });
+       }
+     }
 
     // Kick off
     init();
