@@ -494,6 +494,24 @@
       background: var(--panel);
       box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
     }
+
+    .input-field{
+      width:100%;
+      padding: 10px 12px;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      outline:none;
+      font-size: 15px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .input-field:focus{
+      border-color: var(--accent);
+      background: var(--panel);
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+    }
     .set .index{
       width: 28px;
       height: 28px;
@@ -738,6 +756,22 @@
       box-shadow: var(--shadow);
     }
     .floating-resume .btn{
+      background: var(--accent);
+      border-radius: 20px;
+    }
+
+    /* Floating Generate */
+    .floating-generate{
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      background: linear-gradient(180deg, rgba(255,107,53,0.1), rgba(255,107,53,0.3));
+      padding: 10px;
+      border-radius: 25px;
+      box-shadow: var(--shadow);
+    }
+    .floating-generate .btn{
       background: var(--accent);
       border-radius: 20px;
     }

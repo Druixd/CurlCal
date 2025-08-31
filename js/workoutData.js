@@ -1,4 +1,4 @@
-const WORKOUT_TEMPLATES = [
+let WORKOUT_TEMPLATES = [
   {
     id: "push-strength",
     name: "Push Day - Strength Focus",

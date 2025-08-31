@@ -1,3 +1,5 @@
+    import { GoogleGenAI } from 'https://esm.run/@google/genai';
+
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -13,6 +15,7 @@
         console.log('User signed in:', user.displayName);
         document.getElementById('loginBtn').textContent = truncateName(user.displayName);
         document.getElementById('loginBtn').onclick = () => {
+          document.getElementById('apiKeyInput').value = loadApiKey();
           document.getElementById('userModal').style.display = 'flex';
         };
         // Load user data
@@ -74,6 +77,7 @@
     // ===== Constants and Data =====
     const LS_HISTORY = "GYM_HISTORY_V1";
     const LS_ACTIVE  = "GYM_ACTIVE_WORKOUT_V1";
+    const LS_API_KEY = "GYM_GEMINI_API_KEY_V1";
 
     function truncateName(name, maxLen = 12) {
       return name.length > maxLen ? name.substring(0, maxLen) + '...' : name;
@@ -156,6 +160,14 @@
       return count;
     }
 
+    // API Key utilities
+    function loadApiKey(){
+      return localStorage.getItem(LS_API_KEY) || "";
+    }
+    function saveApiKey(key){
+      localStorage.setItem(LS_API_KEY, key);
+    }
+
     function startWorkoutTimer(){
       if(workoutTimerInterval) clearInterval(workoutTimerInterval);
       workoutTimerInterval = setInterval(() => {
@@ -202,9 +214,16 @@
       const activeMuscle = document.querySelector(".chip.active")?.dataset.muscle || "All";
       const q = document.getElementById("searchInput").value.trim().toLowerCase();
 
-      const items = WORKOUT_TEMPLATES
-        .filter(w => activeMuscle==="All" || w.muscles.includes(activeMuscle))
+      let items = WORKOUT_TEMPLATES
+        .filter(w => {
+          if(activeMuscle === "All") return true;
+          if(activeMuscle === "Custom") return w.isCustom;
+          return w.muscles.includes(activeMuscle);
+        })
         .filter(w => w.name.toLowerCase().includes(q));
+
+      // Sort to show custom first
+      items.sort((a,b) => (b.isCustom ? 1 : 0) - (a.isCustom ? 1 : 0));
 
       grid.innerHTML = "";
       if(items.length === 0){
@@ -541,11 +560,17 @@
     }
 
     function updateResumeChip(){
-      const chip = document.getElementById("floatingResume");
+      const resumeChip = document.getElementById("floatingResume");
+      const generateChip = document.getElementById("floatingGenerate");
       if(activeWorkout && activeTab !== "workout"){
-        chip.style.display = "block";
+        resumeChip.style.display = "block";
+        generateChip.style.display = "none";
+      }else if(activeTab === "library"){
+        resumeChip.style.display = "none";
+        generateChip.style.display = "block";
       }else{
-        chip.style.display = "none";
+        resumeChip.style.display = "none";
+        generateChip.style.display = "none";
       }
     }
 
@@ -660,6 +685,93 @@
       renderWorkout();
     }
 
+    // Generate custom workout
+    async function generateCustomWorkout() {
+      const description = document.getElementById('workoutDescription').value.trim();
+      if (!description) {
+        showToast('Please enter a workout description', 'warn');
+        return;
+      }
+      const apiKey = loadApiKey();
+      if (!apiKey) {
+        document.getElementById('apiKeyMessage').style.display = 'block';
+        document.getElementById('userModal').style.display = 'flex';
+        return;
+      }
+      // Show loading
+      document.getElementById('generateBtn').disabled = true;
+      document.getElementById('generateBtn').textContent = 'Generating...';
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const prompt = `Generate a workout plan based on this description: "${description}".
+
+Output in JSON format with the following structure:
+
+{
+ "id": "unique-id",
+ "name": "Workout Name",
+ "muscles": ["Muscle1", "Muscle2"],
+ "exercises": [
+   {
+     "name": "Exercise Name",
+     "muscle": "Muscle",
+     "defaultSets": 3,
+     "defaultReps": 10,
+     "exercise_link": "https://musclewiki.com/exercise/example"
+   }
+ ]
+}
+
+Make sure the exercises are real and have valid musclewiki links. Include 4-6 exercises.`;
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                muscles: { type: 'array', items: { type: 'string' } },
+                exercises: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' },
+                      muscle: { type: 'string' },
+                      defaultSets: { type: 'number' },
+                      defaultReps: { type: 'number' },
+                      exercise_link: { type: 'string' }
+                    },
+                    required: ['name', 'muscle', 'defaultSets', 'defaultReps', 'exercise_link']
+                  }
+                }
+              },
+              required: ['id', 'name', 'muscles', 'exercises']
+            }
+          }
+        });
+        const workout = JSON.parse(response.candidates[0].content.parts[0].text);
+        workout.isCustom = true;
+        // Add to templates
+        WORKOUT_TEMPLATES.push(workout);
+        // Close modal
+        document.getElementById('generateModal').style.display = 'none';
+        document.getElementById('workoutDescription').value = '';
+        // Re-render library
+        renderLibrary();
+        showToast('Custom workout generated!');
+      } catch (error) {
+        console.error('Error generating workout:', error);
+        showToast('Failed to generate workout', 'error');
+      } finally {
+        document.getElementById('generateBtn').disabled = false;
+        document.getElementById('generateBtn').textContent = 'Generate';
+      }
+    }
+
     // ===== Event Bindings and Initialization =====
     function bindEvents(){
       // Tabs
@@ -668,13 +780,19 @@
       document.getElementById("tab-calendar").addEventListener("click", () => setTab("calendar"));
 
       // User modal
-      document.getElementById('logoutBtn').addEventListener('click', () => {
-        auth.signOut();
-        document.getElementById('userModal').style.display = 'none';
-      });
-      document.getElementById('backBtn').addEventListener('click', () => {
-        document.getElementById('userModal').style.display = 'none';
-      });
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+          auth.signOut();
+          document.getElementById('userModal').style.display = 'none';
+        });
+        document.getElementById('backBtn').addEventListener('click', () => {
+          document.getElementById('userModal').style.display = 'none';
+        });
+        document.getElementById('saveApiKeyBtn').addEventListener('click', () => {
+          const key = document.getElementById('apiKeyInput').value.trim();
+          saveApiKey(key);
+          document.getElementById('apiKeyMessage').style.display = 'none';
+          showToast('API Key saved');
+        });
 
       // Incomplete sets modal
       document.getElementById('continueWorkoutBtn').addEventListener('click', () => {
@@ -748,6 +866,15 @@
         const key = todayKey();
         renderDayDetails(key);
       });
+
+      // Generate custom workout
+      document.getElementById('floatingGenerate').addEventListener('click', () => {
+        document.getElementById('generateModal').style.display = 'flex';
+      });
+      document.getElementById('cancelGenerateBtn').addEventListener('click', () => {
+        document.getElementById('generateModal').style.display = 'none';
+      });
+      document.getElementById('generateBtn').addEventListener('click', generateCustomWorkout);
     }
 
     function init(){

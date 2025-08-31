@@ -46,6 +46,7 @@
             <span class="chip" data-muscle="Arms">Arms</span>
             <span class="chip" data-muscle="Core">Core</span>
             <span class="chip" data-muscle="Full Body">Full Body</span>
+            <span class="chip" data-muscle="Custom">Custom</span>
           </div>
         </div>
         <label class="search" title="Search workouts">
@@ -121,6 +122,14 @@
   <div id="userModal" class="modal" style="display:none">
     <div class="modal-content">
       <h3>User Options</h3>
+      <div id="apiKeyMessage" style="display:none; color: var(--warning); font-size:14px; margin-bottom:8px">
+        Please set your Gemini API key. Get one from <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent)">Google AI Studio</a>.
+      </div>
+      <div style="margin-bottom:16px">
+        <label for="apiKeyInput" style="display:block; margin-bottom:4px">Gemini API Key:</label>
+        <input type="password" id="apiKeyInput" class="input-field" placeholder="Enter your API key">
+      </div>
+      <button id="saveApiKeyBtn" class="btn">Save API Key</button>
       <button id="logoutBtn" class="btn">Logout</button>
       <button id="backBtn" class="btn secondary">Back</button>
     </div>
@@ -135,10 +144,28 @@
     </div>
   </div>
 
+  <div id="generateModal" class="modal" style="display:none">
+    <div class="modal-content">
+      <h3>Generate Custom Workout</h3>
+      <div style="margin-bottom:16px">
+        <label for="workoutDescription" style="display:block; margin-bottom:4px">Describe your workout:</label>
+        <textarea id="workoutDescription" class="input-field" placeholder="e.g., Upper body strength workout for beginners" rows="4"></textarea>
+      </div>
+      <button id="generateBtn" class="btn">Generate</button>
+      <button id="cancelGenerateBtn" class="btn secondary">Cancel</button>
+    </div>
+  </div>
+
   <div id="floatingResume" class="floating-resume" style="display:none">
     <button class="btn">
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3a9 9 0 100 18 9 9 0 000-18Zm-1 5.5a1 1 0 012 0v5.586l3.293-3.293a1 1 0 111.414 1.414l-5 5a.997.997 0 01-1.414 0l-5-5A1 1 0 117.707 10.8L11 14.086V8.5Z"/></svg>
       Resume workout
+    </button>
+  </div>
+
+  <div id="floatingGenerate" class="floating-generate" style="display:none">
+    <button class="btn" title="Generate Custom Workout">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
     </button>
   </div>
 
@@ -152,7 +179,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
+  <!-- Google Gen AI SDK -->
+  <script type="module" src="https://esm.run/@google/genai"></script>
+
   <script src="js/workoutData.js"></script>
-  <script src="js/script.js"></script>
+  <script type="module" src="js/script.js"></script>
 </body>
 </html>
