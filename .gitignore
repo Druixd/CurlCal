@@ -3,3 +3,5 @@ firebase.json
 js/config.js
 firebase-debug.log
 .firebase/hosting..cache
+
+.firebase/
