@@ -79,6 +79,12 @@
     const LS_ACTIVE  = "GYM_ACTIVE_WORKOUT_V1";
     const LS_API_KEY = "GYM_GEMINI_API_KEY_V1";
 
+    // Use comprehensive exercise database
+    const ALL_EXERCISES = COMPREHENSIVE_EXERCISES.map(ex => ({
+      ...ex,
+      muscles: [ex.muscle] // Convert muscle to muscles array for consistency
+    })).sort((a, b) => a.name.localeCompare(b.name));
+
     function truncateName(name, maxLen = 12) {
       return name.length > maxLen ? name.substring(0, maxLen) + '...' : name;
     }
@@ -333,6 +339,10 @@
             <div class="badges">
               ${activeWorkout.muscles.map(m=>`<span class="badge">${m}</span>`).join("")}
             </div>
+            <button class="btn secondary" id="editWorkoutBtn" title="Add exercises to workout">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+              <span class="btn-text">Edit</span>
+            </button>
           </div>
           <div class="muted">${doneSets}/${totalSets} sets completed</div>
         </div>
@@ -423,6 +433,12 @@
         list.addEventListener("input", onSetInput);
         list.addEventListener("click", onSetClick);
       });
+
+      // Edit workout button
+      const editBtn = document.getElementById("editWorkoutBtn");
+      if (editBtn) {
+        editBtn.addEventListener("click", openExerciseSelector);
+      }
 
       // Actions
       document.getElementById("finishWorkoutBtn").disabled = doneSets < totalSets;
@@ -572,6 +588,85 @@
         resumeChip.style.display = "none";
         generateChip.style.display = "none";
       }
+    }
+
+    // ===== Exercise Selector Modal =====
+    let selectedExercises = new Set();
+
+    function openExerciseSelector(){
+      if(!activeWorkout) return;
+      selectedExercises.clear();
+      renderExerciseSelector();
+      document.getElementById('exerciseSelectorModal').style.display = 'flex';
+    }
+
+    function renderExerciseSelector(){
+      const grid = document.getElementById("exerciseSelectorGrid");
+      const activeMuscle = document.querySelector("#exerciseChips .chip.active")?.dataset.muscle || "All";
+      const q = document.getElementById("exerciseSearchInput").value.trim().toLowerCase();
+
+      let items = ALL_EXERCISES
+        .filter(ex => {
+          if(activeMuscle === "All") return true;
+          return ex.muscles.some(muscle => muscle === activeMuscle);
+        })
+        .filter(ex => ex.name.toLowerCase().includes(q));
+
+      // Filter out exercises already in the workout
+      const existingNames = new Set(activeWorkout.exercises.map(ex => ex.name));
+      items = items.filter(ex => !existingNames.has(ex.name));
+
+      grid.innerHTML = "";
+      if(items.length === 0){
+        grid.innerHTML = `
+          <div class="card" style="grid-column: 1 / -1; text-align:center">
+            <div class="muted">No exercises match your filters.</div>
+          </div>
+        `;
+        return;
+      }
+
+      for(const ex of items){
+        const isSelected = selectedExercises.has(ex.name);
+        const el = document.createElement("div");
+        el.className = `card ${isSelected ? 'selected' : ''}`;
+        el.dataset.exercise = ex.name;
+        el.innerHTML = `
+          <div class="title-row">
+            <h3>${ex.name}</h3>
+          </div>
+          <div class="badges">
+            ${ex.muscles.map(m => `<span class="badge">${m}</span>`).join("")}
+          </div>
+          <div class="muted">${ex.muscle}</div>
+        `;
+        grid.appendChild(el);
+      }
+    }
+
+    function addSelectedExercises(){
+      if(!activeWorkout || selectedExercises.size === 0) return;
+
+      const exercisesToAdd = Array.from(selectedExercises).map(name => {
+        const ex = ALL_EXERCISES.find(e => e.name === name);
+        return {
+          name: ex.name,
+          muscle: ex.muscle,
+          exercise_link: ex.exercise_link,
+          sets: Array.from({ length: ex.defaultSets }, () => ({
+            weight: 0,
+            reps: ex.defaultReps,
+            completed: false
+          }))
+        };
+      });
+
+      activeWorkout.exercises.push(...exercisesToAdd);
+      saveActiveWorkout();
+      renderWorkout();
+      document.getElementById('exerciseSelectorModal').style.display = 'none';
+      selectedExercises.clear();
+      showToast(`Added ${exercisesToAdd.length} exercise${exercisesToAdd.length > 1 ? 's' : ''} to workout`);
     }
 
     // ===== Calendar =====
@@ -875,6 +970,33 @@ Make sure the exercises are real and have valid musclewiki links. Include 4-6 ex
         document.getElementById('generateModal').style.display = 'none';
       });
       document.getElementById('generateBtn').addEventListener('click', generateCustomWorkout);
+
+      // Exercise selector modal
+      const exerciseChips = document.getElementById("exerciseChips");
+      exerciseChips.addEventListener("click", (e) => {
+        const chip = e.target.closest(".chip");
+        if(!chip) return;
+        exerciseChips.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c === chip));
+        renderExerciseSelector();
+      });
+      document.getElementById("exerciseSearchInput").addEventListener("input", renderExerciseSelector);
+      document.getElementById("exerciseSelectorGrid").addEventListener("click", (e) => {
+        const card = e.target.closest(".card");
+        if(!card) return;
+        const exerciseName = card.dataset.exercise;
+        if(selectedExercises.has(exerciseName)){
+          selectedExercises.delete(exerciseName);
+          card.classList.remove("selected");
+        } else {
+          selectedExercises.add(exerciseName);
+          card.classList.add("selected");
+        }
+      });
+      document.getElementById('addSelectedExercisesBtn').addEventListener('click', addSelectedExercises);
+      document.getElementById('cancelExerciseSelectorBtn').addEventListener('click', () => {
+        document.getElementById('exerciseSelectorModal').style.display = 'none';
+        selectedExercises.clear();
+      });
     }
 
     function init(){

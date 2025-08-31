@@ -156,6 +156,37 @@
     </div>
   </div>
 
+  <div id="exerciseSelectorModal" class="modal" style="display:none">
+    <div class="modal-content" style="max-width:600px">
+      <h3>Add Exercises to Workout</h3>
+      <div class="filters" style="margin-bottom:16px">
+        <div class="filter-chips">
+          <div id="exerciseChips" class="chips">
+            <span class="chip active" data-muscle="All">All</span>
+            <span class="chip" data-muscle="Chest">Chest</span>
+            <span class="chip" data-muscle="Back">Back</span>
+            <span class="chip" data-muscle="Shoulders">Shoulders</span>
+            <span class="chip" data-muscle="Arms">Arms</span>
+            <span class="chip" data-muscle="Legs">Legs</span>
+            <span class="chip" data-muscle="Core">Core</span>
+            <span class="chip" data-muscle="Bodyweight">Bodyweight</span>
+            <span class="chip" data-muscle="Cardio">Cardio</span>
+            <span class="chip" data-muscle="Full Body">Full Body</span>
+          </div>
+        </div>
+        <label class="search" title="Search exercises">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#94a3b8" aria-hidden="true"><path d="M21 20l-5.7-5.7a7 7 0 10-1.4 1.4L20 21l1-1zM5 10a5 5 0 1110 0 5 5 0 01-10 0z"/></svg>
+          <input id="exerciseSearchInput" type="search" placeholder="Search exercises..." aria-label="Search exercises" />
+        </label>
+      </div>
+      <div id="exerciseSelectorGrid" class="grid" style="max-height:400px; overflow-y:auto; margin-bottom:16px"></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end">
+        <button id="addSelectedExercisesBtn" class="btn">Add Selected</button>
+        <button id="cancelExerciseSelectorBtn" class="btn secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="floatingResume" class="floating-resume" style="display:none">
     <button class="btn">
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3a9 9 0 100 18 9 9 0 000-18Zm-1 5.5a1 1 0 012 0v5.586l3.293-3.293a1 1 0 111.414 1.414l-5 5a.997.997 0 01-1.414 0l-5-5A1 1 0 117.707 10.8L11 14.086V8.5Z"/></svg>

@@ -736,6 +736,9 @@
       flex-direction: column;
       gap: 16px;
       min-width: 250px;
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     .modal-content h3{
       margin: 0;
@@ -921,6 +924,26 @@
         padding-right: 16px;
         mask-image: linear-gradient(to right, transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
         -webkit-mask-image: linear-gradient(to right, transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
+      }
+
+      /* Exercise selector modal mobile styles */
+      #exerciseSelectorModal .modal-content {
+        max-width: 95vw;
+        width: 95vw;
+        padding: 16px;
+      }
+
+      #exerciseSelectorModal .filter-chips {
+        width: calc(100vw - 32px);
+        margin-left: 0;
+        padding-left: 0;
+        padding-right: 0;
+        mask-image: linear-gradient(to right, transparent 0%, black 8px, black calc(100% - 8px), transparent 100%);
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8px, black calc(100% - 8px), transparent 100%);
+      }
+
+      #exerciseSelectorModal #exerciseSelectorGrid {
+        max-height: 60vh;
       }
     }
     
