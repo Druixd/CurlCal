@@ -250,7 +250,12 @@
       // render tab-specific
       if(name === "library") renderLibrary();
       if(name === "workout") renderWorkout();
-      if(name === "calendar") { renderCalendar(); renderDayDetails(null); }
+      if(name === "calendar") {
+        calendarCursor = new Date();
+        renderCalendar();
+        const today = todayKey();
+        renderDayDetails(today);
+      }
 
       updateResumeChip();
     }
@@ -682,6 +687,9 @@
       history.push(record);
       saveHistory();
 
+      // Generate AI summary
+      generateWorkoutSummary(record);
+
       // Clear active
       activeWorkout = null;
       saveActiveWorkout();
@@ -941,18 +949,18 @@
 Output in JSON format with the following structure:
 
 {
-  "id": "unique-id",
-  "name": "Workout Name",
-  "muscles": ["Muscle1", "Muscle2"],
-  "exercises": [
-    {
-      "name": "Exercise Name",
-      "muscle": "Muscle",
-      "defaultSets": 3,
-      "defaultReps": 10,
-      "exercise_link": "https://musclewiki.com/exercise/example"
-    }
-  ]
+ "id": "unique-id",
+ "name": "Workout Name",
+ "muscles": ["Muscle1", "Muscle2"],
+ "exercises": [
+   {
+     "name": "Exercise Name",
+     "muscle": "Muscle",
+     "defaultSets": 3,
+     "defaultReps": 10,
+     "exercise_link": "https://musclewiki.com/exercise/example"
+   }
+ ]
 }
 
 Make sure the exercises are real and have valid musclewiki links. ${countInstruction}`;
@@ -1003,6 +1011,71 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
         document.getElementById('generateBtn').disabled = false;
         document.getElementById('generateBtn').textContent = 'Generate';
       }
+    }
+
+    // Generate workout summary
+    async function generateWorkoutSummary(currentWorkout) {
+      const apiKey = loadApiKey();
+      if (!apiKey) {
+        showToast('Set Gemini API key for workout summaries', 'warn');
+        return;
+      }
+
+      // Get past workouts of same name
+      const pastWorkouts = history.filter(h => h.name === currentWorkout.name && h.dateKey !== currentWorkout.dateKey).sort((a,b) => b.dateKey.localeCompare(a.dateKey)).slice(0,3);
+
+      const prompt = `Analyze this workout and provide a concise summary with ratings.
+
+Current workout: ${JSON.stringify(currentWorkout)}
+
+Past workouts: ${JSON.stringify(pastWorkouts)}
+
+Provide in JSON:
+
+{
+ "rating": "X/10 (brief reason)",
+ "keyMetrics": "Brief summary of sets, weights, time",
+ "comparison": "How it compares to past (if any)",
+ "tips": "2-3 short improvement tips"
+}
+
+Keep everything minimal and actionable.`;
+
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'object',
+              properties: {
+                rating: { type: 'string' },
+                keyMetrics: { type: 'string' },
+                comparison: { type: 'string' },
+                tips: { type: 'string' }
+              },
+              required: ['rating', 'keyMetrics', 'comparison', 'tips']
+            }
+          }
+        });
+        const result = JSON.parse(response.candidates[0].content.parts[0].text);
+        showWorkoutSummaryModal(result);
+      } catch (error) {
+        console.error('Error generating summary:', error);
+        showToast('Failed to generate workout summary', 'error');
+      }
+    }
+
+    function showWorkoutSummaryModal(result) {
+      document.getElementById('summaryContent').innerHTML = `
+        <p><strong>Rating:</strong> ${result.rating}</p>
+        <p><strong>Key Metrics:</strong> ${result.keyMetrics}</p>
+        <p><strong>Comparison:</strong> ${result.comparison}</p>
+        <p><strong>Tips:</strong> ${result.tips}</p>
+      `;
+      document.getElementById('summaryModal').style.display = 'flex';
     }
 
     // ===== Event Bindings and Initialization =====
@@ -1113,6 +1186,14 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
       });
       document.getElementById('generateBtn').addEventListener('click', generateCustomWorkout);
 
+      // Workout summary modal
+      const closeSummaryBtn = document.getElementById('closeSummaryModal');
+      if (closeSummaryBtn) {
+        closeSummaryBtn.addEventListener('click', () => {
+          document.getElementById('summaryModal').style.display = 'none';
+        });
+      }
+
       // Exercise selector modal
       const exerciseChips = document.getElementById("exerciseChips");
       exerciseChips.addEventListener("click", (e) => {
@@ -1169,12 +1250,18 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
       });
 
       // Break modal
-      document.getElementById('breakMinus30').addEventListener('click', () => modifyBreakTime(-30));
-      document.getElementById('breakMinus10').addEventListener('click', () => modifyBreakTime(-10));
-      document.getElementById('breakEnd').addEventListener('click', endBreakTimer);
-      document.getElementById('breakPlus10').addEventListener('click', () => modifyBreakTime(10));
-      document.getElementById('breakPlus30').addEventListener('click', () => modifyBreakTime(30));
-      document.getElementById('closeBreakModal').addEventListener('click', endBreakTimer);
+      const breakMinus30 = document.getElementById('breakMinus30');
+      if (breakMinus30) breakMinus30.addEventListener('click', () => modifyBreakTime(-30));
+      const breakMinus10 = document.getElementById('breakMinus10');
+      if (breakMinus10) breakMinus10.addEventListener('click', () => modifyBreakTime(-10));
+      const breakEnd = document.getElementById('breakEnd');
+      if (breakEnd) breakEnd.addEventListener('click', endBreakTimer);
+      const breakPlus10 = document.getElementById('breakPlus10');
+      if (breakPlus10) breakPlus10.addEventListener('click', () => modifyBreakTime(10));
+      const breakPlus30 = document.getElementById('breakPlus30');
+      if (breakPlus30) breakPlus30.addEventListener('click', () => modifyBreakTime(30));
+      const closeBreakModal = document.getElementById('closeBreakModal');
+      if (closeBreakModal) closeBreakModal.addEventListener('click', endBreakTimer);
 
       // Global click to revert active delete set
       document.addEventListener('click', (e) => {
@@ -1186,10 +1273,12 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
 
     function init(){
        breakDuration = loadBreakDuration();
+       calendarCursor = new Date();
        updateResumeChip();
        renderLibrary();
        renderCalendar();
-       renderDayDetails(null);
+       const today = todayKey();
+       renderDayDetails(today);
        bindEvents();
 
        // Register service worker
