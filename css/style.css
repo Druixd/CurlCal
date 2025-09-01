@@ -365,6 +365,7 @@
       font-size: 14px;
       box-shadow: var(--shadow-sm);
       outline: none;
+      -webkit-tap-highlight-color: transparent;
     }
     .btn svg{
       width:16px;

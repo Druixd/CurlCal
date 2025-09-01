@@ -290,11 +290,13 @@
           name: ex.name,
           muscle: ex.muscle,
           exercise_link: ex.exercise_link,
-          sets: Array.from({ length: ex.defaultSets }, () => ({
-            weight: 0,
-            reps: ex.defaultReps,
-            completed: false
-          }))
+          trackingType: ex.trackingType || "weight_reps",
+          sets: Array.from({ length: ex.defaultSets }, () => {
+            const isTimeDistance = ex.trackingType === "time_distance";
+            return isTimeDistance
+              ? { time: 0, distance: 0, completed: false }
+              : { weight: 0, reps: ex.defaultReps, completed: false };
+          })
         }))
       };
       saveActiveWorkout();
@@ -350,6 +352,7 @@
       `;
 
       activeWorkout.exercises.forEach((ex, ei)=>{
+        const isTimeDistance = ex.trackingType === "time_distance";
         html += `
           <div class="exercise" data-ex="${ei}">
             <div class="row">
@@ -379,8 +382,13 @@
               ${(ex.sets||[]).map((s, si)=>`
                 <div class="set" data-ex="${ei}" data-set="${si}">
                   <div class="index">${si+1}</div>
-                  <input type="number" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
-                  <input type="number" inputmode="numeric" step="1" placeholder="Reps" value="${s.reps ?? ''}" data-reps />
+                  ${isTimeDistance ? `
+                    <input type="number" inputmode="decimal" step="0.1" placeholder="Time (min)" value="${s.time ?? ''}" data-time />
+                    <input type="number" inputmode="decimal" step="0.1" placeholder="Distance (km)" value="${s.distance ?? ''}" data-distance />
+                  ` : `
+                    <input type="number" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
+                    <input type="number" inputmode="numeric" step="1" placeholder="Reps" value="${s.reps ?? ''}" data-reps />
+                  `}
                   <div class="complete ${s.completed?'checked':''}" data-complete title="Mark set complete">
                     ${s.completed ? '&#10003;' : ''}
                   </div>
@@ -456,6 +464,8 @@
       const s  = ex.sets[si];
       if(target.hasAttribute("data-weight")) s.weight = Number(target.value || 0);
       if(target.hasAttribute("data-reps"))   s.reps   = Number(target.value || 0);
+      if(target.hasAttribute("data-time"))   s.time   = Number(target.value || 0);
+      if(target.hasAttribute("data-distance")) s.distance = Number(target.value || 0);
       saveActiveWorkout();
       updateWorkoutProgressBar();
     }
@@ -485,7 +495,11 @@
       if(!activeWorkout) return;
       const ex = activeWorkout.exercises[ei];
       if(!ex.sets) ex.sets = [];
-      ex.sets.push({ weight: 0, reps: 0, completed: false });
+      const isTimeDistance = ex.trackingType === "time_distance";
+      const newSet = isTimeDistance
+        ? { time: 0, distance: 0, completed: false }
+        : { weight: 0, reps: 0, completed: false };
+      ex.sets.push(newSet);
       saveActiveWorkout();
       renderWorkout();
     }
@@ -551,11 +565,18 @@
         exercises: activeWorkout.exercises.map(ex => ({
           name: ex.name,
           muscle: ex.muscle,
-          sets: ex.sets.filter(s => s.reps || s.weight || s.completed).map(s => ({
-            weight: Number(s.weight || 0),
-            reps: Number(s.reps || 0),
-            completed: !!s.completed
-          }))
+          sets: ex.sets.filter(s => s.reps || s.weight || s.time || s.distance || s.completed).map(s => {
+            const isTimeDistance = ex.trackingType === "time_distance";
+            return isTimeDistance ? {
+              time: Number(s.time || 0),
+              distance: Number(s.distance || 0),
+              completed: !!s.completed
+            } : {
+              weight: Number(s.weight || 0),
+              reps: Number(s.reps || 0),
+              completed: !!s.completed
+            };
+          })
         }))
       };
       history.push(record);
@@ -649,15 +670,17 @@
 
       const exercisesToAdd = Array.from(selectedExercises).map(name => {
         const ex = ALL_EXERCISES.find(e => e.name === name);
+        const isTimeDistance = ex.trackingType === "time_distance";
         return {
           name: ex.name,
           muscle: ex.muscle,
           exercise_link: ex.exercise_link,
-          sets: Array.from({ length: ex.defaultSets }, () => ({
-            weight: 0,
-            reps: ex.defaultReps,
-            completed: false
-          }))
+          trackingType: ex.trackingType || "weight_reps",
+          sets: Array.from({ length: ex.defaultSets }, () => (
+            isTimeDistance
+              ? { time: 0, distance: 0, completed: false }
+              : { weight: 0, reps: ex.defaultReps, completed: false }
+          ))
         };
       });
 
@@ -752,6 +775,16 @@
         const parts = r.exercises.map(ex => {
           const sz = ex.sets?.length || 0;
           const dz = ex.sets?.filter(s => s.completed).length || 0;
+          // Check if this exercise has time/distance data
+          const hasTimeDistance = ex.sets?.some(s => s.time || s.distance);
+          if (hasTimeDistance) {
+            const totalTime = ex.sets?.reduce((sum, s) => sum + (s.time || 0), 0) || 0;
+            const totalDistance = ex.sets?.reduce((sum, s) => sum + (s.distance || 0), 0) || 0;
+            const timeStr = totalTime > 0 ? `${totalTime}min` : '';
+            const distStr = totalDistance > 0 ? `${totalDistance}km` : '';
+            const metrics = [timeStr, distStr].filter(Boolean).join('/');
+            return `${ex.name} (${dz}/${sz}${metrics ? ` - ${metrics}` : ''})`;
+          }
           return `${ex.name} (${dz}/${sz})`;
         }).join(" • ");
         return `
@@ -798,26 +831,31 @@
       document.getElementById('generateBtn').textContent = 'Generating...';
       try {
         const ai = new GoogleGenAI({ apiKey });
+        // Parse exercise count from description
+        const countMatch = description.match(/(\d+)\s*(?:exercises?|exs?)/i);
+        const exerciseCount = countMatch ? parseInt(countMatch[1]) : null;
+        const countInstruction = exerciseCount ? `Include exactly ${exerciseCount} exercises.` : 'Include 4-6 exercises.';
+
         const prompt = `Generate a workout plan based on this description: "${description}".
 
 Output in JSON format with the following structure:
 
 {
- "id": "unique-id",
- "name": "Workout Name",
- "muscles": ["Muscle1", "Muscle2"],
- "exercises": [
-   {
-     "name": "Exercise Name",
-     "muscle": "Muscle",
-     "defaultSets": 3,
-     "defaultReps": 10,
-     "exercise_link": "https://musclewiki.com/exercise/example"
-   }
- ]
+  "id": "unique-id",
+  "name": "Workout Name",
+  "muscles": ["Muscle1", "Muscle2"],
+  "exercises": [
+    {
+      "name": "Exercise Name",
+      "muscle": "Muscle",
+      "defaultSets": 3,
+      "defaultReps": 10,
+      "exercise_link": "https://musclewiki.com/exercise/example"
+    }
+  ]
 }
 
-Make sure the exercises are real and have valid musclewiki links. Include 4-6 exercises.`;
+Make sure the exercises are real and have valid musclewiki links. ${countInstruction}`;
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: prompt,
