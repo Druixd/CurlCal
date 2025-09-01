@@ -96,6 +96,8 @@
     let activeWorkout = null;
     let calendarCursor = new Date(); // month being viewed
     let workoutTimerInterval = null;
+    let selectedExerciseIndex = null;
+    let activeDeleteSet = null; // {ei, si} or null
 
     // ===== Utilities =====
     function loadHistory(){
@@ -308,6 +310,7 @@
 
     // ===== Workout Rendering =====
     function renderWorkout(){
+      revertActiveDeleteSet(); // Reset any active delete mode
       const wrap = document.getElementById("workoutContent");
       const actions = document.getElementById("workoutActions");
       if(!activeWorkout){
@@ -362,7 +365,7 @@
                     <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M8 5v14l11-7z"/></svg>
                   </button>
                   <div>
-                    <div class="name">${ex.name}</div>
+                    <div class="name exercise-name-btn" data-ex="${ei}">${ex.name}</div>
                     <div class="muscle">${ex.muscle}</div>
                   </div>
                 </div>
@@ -381,7 +384,7 @@
             <div class="set-list">
               ${(ex.sets||[]).map((s, si)=>`
                 <div class="set" data-ex="${ei}" data-set="${si}">
-                  <div class="index">${si+1}</div>
+                  <div class="index set-index-btn" data-ei="${ei}" data-si="${si}">${si+1}</div>
                   ${isTimeDistance ? `
                     <input type="number" inputmode="decimal" step="0.1" placeholder="Time (min)" value="${s.time ?? ''}" data-time />
                     <input type="number" inputmode="decimal" step="0.1" placeholder="Distance (km)" value="${s.distance ?? ''}" data-distance />
@@ -391,9 +394,6 @@
                   `}
                   <div class="complete ${s.completed?'checked':''}" data-complete title="Mark set complete">
                     ${s.completed ? '&#10003;' : ''}
-                  </div>
-                  <div class="icon-btn" data-remove title="Remove set">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#cbd5e1"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                   </div>
                 </div>
               `).join("")}
@@ -440,6 +440,27 @@
       wrap.querySelectorAll(".set-list").forEach(list=>{
         list.addEventListener("input", onSetInput);
         list.addEventListener("click", onSetClick);
+      });
+
+      // Set index buttons
+      wrap.querySelectorAll('.set-index-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const ei = Number(this.getAttribute('data-ei'));
+          const si = Number(this.getAttribute('data-si'));
+          handleSetIndexClick(ei, si, this);
+        });
+      });
+
+      // Exercise name buttons
+      wrap.querySelectorAll('.exercise-name-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          selectedExerciseIndex = Number(this.getAttribute('data-ex'));
+          document.getElementById('exerciseOptionsModal').style.display = 'flex';
+        });
       });
 
       // Edit workout button
@@ -524,6 +545,32 @@
       ex.sets.forEach(s => s.completed = true);
       saveActiveWorkout();
       renderWorkout();
+    }
+
+    function handleSetIndexClick(ei, si, btnEl){
+      if(!activeWorkout) return;
+
+      if(activeDeleteSet && activeDeleteSet.ei === ei && activeDeleteSet.si === si){
+        // Second click: delete the set
+        removeSet(ei, si);
+        activeDeleteSet = null;
+      } else {
+        // First click: activate delete mode
+        revertActiveDeleteSet();
+        activeDeleteSet = {ei, si};
+        btnEl.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="#cbd5e1"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+        btnEl.classList.add('delete-mode');
+      }
+    }
+
+    function revertActiveDeleteSet(){
+      if(!activeDeleteSet) return;
+      const btn = document.querySelector(`.set-index-btn[data-ei="${activeDeleteSet.ei}"][data-si="${activeDeleteSet.si}"]`);
+      if(btn){
+        btn.innerHTML = activeDeleteSet.si + 1;
+        btn.classList.remove('delete-mode');
+      }
+      activeDeleteSet = null;
     }
 
     function discardWorkout(){
@@ -1034,6 +1081,41 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
       document.getElementById('cancelExerciseSelectorBtn').addEventListener('click', () => {
         document.getElementById('exerciseSelectorModal').style.display = 'none';
         selectedExercises.clear();
+      });
+
+      // Exercise options modal
+      document.getElementById('previewExerciseBtn').addEventListener('click', () => {
+        if (selectedExerciseIndex !== null && activeWorkout) {
+          const ex = activeWorkout.exercises[selectedExerciseIndex];
+          if (ex.exercise_link && ex.exercise_link !== '#') {
+            window.open(ex.exercise_link, '_blank');
+          } else {
+            const query = encodeURIComponent(ex.name + ' exercise');
+            window.open(`https://www.google.com/search?q=${query}`, '_blank');
+          }
+        }
+        document.getElementById('exerciseOptionsModal').style.display = 'none';
+      });
+
+      document.getElementById('removeExerciseBtn').addEventListener('click', () => {
+        if (selectedExerciseIndex !== null && activeWorkout) {
+          activeWorkout.exercises.splice(selectedExerciseIndex, 1);
+          saveActiveWorkout();
+          renderWorkout();
+          showToast('Exercise removed from workout');
+        }
+        document.getElementById('exerciseOptionsModal').style.display = 'none';
+      });
+
+      document.getElementById('cancelExerciseOptionsBtn').addEventListener('click', () => {
+        document.getElementById('exerciseOptionsModal').style.display = 'none';
+      });
+
+      // Global click to revert active delete set
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.set-index-btn')) {
+          revertActiveDeleteSet();
+        }
       });
     }
 
