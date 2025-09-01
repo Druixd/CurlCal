@@ -16,6 +16,7 @@
         document.getElementById('loginBtn').textContent = truncateName(user.displayName);
         document.getElementById('loginBtn').onclick = () => {
           document.getElementById('apiKeyInput').value = loadApiKey();
+          document.getElementById('breakDurationSelect').value = loadBreakDuration().toString();
           document.getElementById('userModal').style.display = 'flex';
         };
         // Load user data
@@ -78,6 +79,7 @@
     const LS_HISTORY = "GYM_HISTORY_V1";
     const LS_ACTIVE  = "GYM_ACTIVE_WORKOUT_V1";
     const LS_API_KEY = "GYM_GEMINI_API_KEY_V1";
+    const LS_BREAK_DURATION = "GYM_BREAK_DURATION_V1";
 
     // Use comprehensive exercise database
     const ALL_EXERCISES = COMPREHENSIVE_EXERCISES.map(ex => ({
@@ -98,6 +100,9 @@
     let workoutTimerInterval = null;
     let selectedExerciseIndex = null;
     let activeDeleteSet = null; // {ei, si} or null
+    let breakTimerInterval = null;
+    let breakTimeRemaining = 0;
+    let breakDuration = 90; // default 90 seconds
 
     // ===== Utilities =====
     function loadHistory(){
@@ -145,15 +150,15 @@
       toast.classList.remove("show");
       // color by kind
       if(kind==="success"){
-        toast.style.background = "rgba(16,185,129,.18)";
+        toast.style.background = "rgba(16,185,129,.9)";
         toast.style.borderColor = "rgba(16,185,129,.4)";
         toast.style.color = "#ecfeff";
       }else if(kind==="warn"){
-        toast.style.background = "rgba(245,158,11,.18)";
+        toast.style.background = "rgba(245,158,11,.9)";
         toast.style.borderColor = "rgba(245,158,11,.4)";
         toast.style.color = "#fff7ed";
       }else{
-        toast.style.background = "rgba(239,68,68,.18)";
+        toast.style.background = "rgba(239,68,68,.9)";
         toast.style.borderColor = "rgba(239,68,68,.4)";
         toast.style.color = "#fee2e2";
       }
@@ -174,6 +179,48 @@
     }
     function saveApiKey(key){
       localStorage.setItem(LS_API_KEY, key);
+    }
+
+    // Break timer utilities
+    function loadBreakDuration(){
+      return parseInt(localStorage.getItem(LS_BREAK_DURATION) || "90");
+    }
+    function saveBreakDuration(duration){
+      localStorage.setItem(LS_BREAK_DURATION, duration.toString());
+    }
+
+    function startBreakTimer(){
+      if(breakTimerInterval) clearInterval(breakTimerInterval);
+      breakTimeRemaining = breakDuration;
+      updateBreakDisplay();
+      document.getElementById('breakModal').style.display = 'flex';
+
+      breakTimerInterval = setInterval(() => {
+        breakTimeRemaining--;
+        updateBreakDisplay();
+        if(breakTimeRemaining <= 0){
+          endBreakTimer();
+        }
+      }, 1000);
+    }
+
+    function endBreakTimer(){
+      if(breakTimerInterval) clearInterval(breakTimerInterval);
+      breakTimerInterval = null;
+      document.getElementById('breakModal').style.display = 'none';
+      showToast("Break ended", "success");
+    }
+
+    function updateBreakDisplay(){
+      const minutes = Math.floor(breakTimeRemaining / 60);
+      const seconds = breakTimeRemaining % 60;
+      const display = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+      document.getElementById('breakCountdown').textContent = display;
+    }
+
+    function modifyBreakTime(seconds){
+      breakTimeRemaining = Math.max(0, breakTimeRemaining + seconds);
+      updateBreakDisplay();
     }
 
     function startWorkoutTimer(){
@@ -338,19 +385,20 @@
       const doneSets = countCompletedSets(activeWorkout);
 
       let html = `
-        <div class="workout-head">
-          <div style="display:flex; align-items:center; gap:10px">
-            <div style="font-weight:800; letter-spacing:.4px">${activeWorkout.name}</div>
-            <div class="badges">
-              ${activeWorkout.muscles.map(m=>`<span class="badge">${m}</span>`).join("")}
-            </div>
-            <button class="btn secondary" id="editWorkoutBtn" title="Add exercises to workout">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-              <span class="btn-text">Edit</span>
-            </button>
-          </div>
-          <div class="muted">${doneSets}/${totalSets} sets completed</div>
-        </div>
+       <div class="workout-head">
+         <div style="display:flex; align-items:center; gap:10px">
+           <div style="font-weight:800; letter-spacing:.4px">${activeWorkout.name}</div>
+           <div class="badges">
+             ${activeWorkout.muscles.map(m=>`<span class="badge">${m}</span>`).join("")}
+           </div>
+         </div>
+         <div style="display:flex; align-items:center; gap:10px">
+           <div class="muted">${doneSets}/${totalSets} sets completed</div>
+           <button class="btn secondary" id="editWorkoutBtn" title="Add exercises to workout">
+             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+           </button>
+         </div>
+       </div>
         <div class="exercise-list">
       `;
 
@@ -538,6 +586,11 @@
       btnEl.classList.toggle("checked", s.completed);
       btnEl.innerHTML = s.completed ? "&#10003;" : "";
       updateWorkoutProgressBar();
+
+      // Auto-trigger break if set is completed
+      if(s.completed){
+        startBreakTimer();
+      }
     }
     function completeAllSets(ei){
       const ex = activeWorkout.exercises[ei];
@@ -969,9 +1022,12 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
         });
         document.getElementById('saveApiKeyBtn').addEventListener('click', () => {
           const key = document.getElementById('apiKeyInput').value.trim();
+          const breakDurationValue = parseInt(document.getElementById('breakDurationSelect').value);
           saveApiKey(key);
+          saveBreakDuration(breakDurationValue);
+          breakDuration = breakDurationValue;
           document.getElementById('apiKeyMessage').style.display = 'none';
-          showToast('API Key saved');
+          showToast('Settings saved');
         });
 
       // Incomplete sets modal
@@ -993,6 +1049,7 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
       // Workout persistent actions
       document.getElementById("finishWorkoutBtn").addEventListener("click", finishWorkout);
       document.getElementById("discardWorkoutBtn").addEventListener("click", discardWorkout);
+      document.getElementById("breakBtn").addEventListener("click", startBreakTimer);
 
       // Go to Library buttons (present in different states)
       document.getElementById("gotoLibraryBtn")?.addEventListener("click", () => setTab("library"));
@@ -1111,6 +1168,14 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
         document.getElementById('exerciseOptionsModal').style.display = 'none';
       });
 
+      // Break modal
+      document.getElementById('breakMinus30').addEventListener('click', () => modifyBreakTime(-30));
+      document.getElementById('breakMinus10').addEventListener('click', () => modifyBreakTime(-10));
+      document.getElementById('breakEnd').addEventListener('click', endBreakTimer);
+      document.getElementById('breakPlus10').addEventListener('click', () => modifyBreakTime(10));
+      document.getElementById('breakPlus30').addEventListener('click', () => modifyBreakTime(30));
+      document.getElementById('closeBreakModal').addEventListener('click', endBreakTimer);
+
       // Global click to revert active delete set
       document.addEventListener('click', (e) => {
         if (!e.target.closest('.set-index-btn')) {
@@ -1120,6 +1185,7 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
     }
 
     function init(){
+       breakDuration = loadBreakDuration();
        updateResumeChip();
        renderLibrary();
        renderCalendar();

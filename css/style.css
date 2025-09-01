@@ -26,6 +26,7 @@
       box-sizing:border-box;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      -webkit-tap-highlight-color: transparent;
     }
     html,body{ height:100% }
     body{
@@ -589,22 +590,22 @@
       padding: 20px 0;
       background: linear-gradient(180deg, transparent, var(--bg) 30%);
       display:flex;
-      justify-content: space-between;
-      align-items: center;
+      justify-content: space-around;
+      align-items: stretch;
       gap: 12px;
     }
-    .action-buttons{
-      display: flex;
-      gap: 12px;
+    .sticky-actions > * {
+      flex: 1;
     }
     #workoutTimer{
       font-size: 18px;
       font-weight: 600;
       color: var(--accent);
       background: var(--panel-2);
-      padding: 8px 12px;
+      padding: 12px 20px;
       border-radius: var(--radius-sm);
       border: 1px solid var(--border);
+      text-align: center;
     }
 
     .exercise-link-btn{
@@ -798,7 +799,7 @@
     .toast{
       position: fixed;
       right: 20px;
-      bottom: 20px;
+      top: 100px;
       z-index: 50;
       padding: 16px 20px;
       border-radius: var(--radius-sm);
@@ -806,7 +807,7 @@
       background: var(--success);
       border: none;
       box-shadow: var(--shadow);
-      transform: translateY(100px);
+      transform: translateX(100%);
       opacity: 0;
       pointer-events: none;
       transition: all 0.4s ease;
@@ -815,7 +816,7 @@
       max-width: 300px;
     }
     .toast.show{
-      transform: translateY(0);
+      transform: translateX(0);
       opacity: 1;
     }
 

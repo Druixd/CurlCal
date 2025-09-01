@@ -72,17 +72,19 @@
         </div>
       </div>
       <div class="sticky-actions" id="workoutActions" style="display:none">
+        <button class="btn secondary" id="breakBtn" title="Start break timer">
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <span class="btn-text">Break</span>
+        </button>
         <div id="workoutTimer" class="muted">00:00</div>
-        <div class="action-buttons">
-          <button class="btn secondary" id="discardWorkoutBtn" title="Discard current workout">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            <span class="btn-text">Discard</span>
-          </button>
-          <button class="btn success" id="finishWorkoutBtn">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20.3 7.7l-1.4-1.4z"/></svg>
-            <span class="btn-text">Finish Workout</span>
-          </button>
-        </div>
+        <button class="btn secondary" id="discardWorkoutBtn" title="Discard current workout">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          <span class="btn-text">Discard</span>
+        </button>
+        <button class="btn success" id="finishWorkoutBtn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20.3 7.7l-1.4-1.4z"/></svg>
+          <span class="btn-text">Finish Workout</span>
+        </button>
       </div>
     </section>
 
@@ -129,7 +131,17 @@
         <label for="apiKeyInput" style="display:block; margin-bottom:4px">Gemini API Key:</label>
         <input type="password" id="apiKeyInput" class="input-field" placeholder="Enter your API key">
       </div>
-      <button id="saveApiKeyBtn" class="btn">Save API Key</button>
+      <div style="margin-bottom:16px">
+        <label for="breakDurationSelect" style="display:block; margin-bottom:4px">Break Duration (seconds):</label>
+        <select id="breakDurationSelect" class="input-field">
+          <option value="30">30</option>
+          <option value="60">60</option>
+          <option value="90" selected>90</option>
+          <option value="120">120</option>
+          <option value="180">180</option>
+        </select>
+      </div>
+      <button id="saveApiKeyBtn" class="btn">Save Settings</button>
       <button id="logoutBtn" class="btn">Logout</button>
       <button id="backBtn" class="btn secondary">Back</button>
     </div>
@@ -206,6 +218,21 @@
       <button id="previewExerciseBtn" class="btn">Preview Exercise</button>
       <button id="removeExerciseBtn" class="btn secondary">Remove from Workout</button>
       <button id="cancelExerciseOptionsBtn" class="btn secondary">Cancel</button>
+    </div>
+  </div>
+
+  <div id="breakModal" class="modal" style="display:none">
+    <div class="modal-content">
+      <h3>Break Time</h3>
+      <div id="breakCountdown" style="font-size: 48px; font-weight: 700; text-align: center; margin: 20px 0; color: var(--accent);">01:30</div>
+      <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 20px;">
+        <button id="breakMinus30" class="btn secondary" title="Subtract 30 seconds">-30</button>
+        <button id="breakMinus10" class="btn secondary" title="Subtract 10 seconds">-10</button>
+        <button id="breakEnd" class="btn danger" title="End break">End</button>
+        <button id="breakPlus10" class="btn secondary" title="Add 10 seconds">+10</button>
+        <button id="breakPlus30" class="btn secondary" title="Add 30 seconds">+30</button>
+      </div>
+      <button id="closeBreakModal" class="btn secondary" style="width: 100%;">Close</button>
     </div>
   </div>
 
