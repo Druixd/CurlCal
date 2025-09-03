@@ -144,24 +144,25 @@
       const t = (new Date(isoEnd) - new Date(isoStart)) / 60000;
       return Math.max(1, Math.round(t));
     }
-    function showToast(text, kind="success"){
+    function showToast(text, kind="info"){
       const toast = document.getElementById("toast");
       toast.textContent = text;
       toast.classList.remove("show");
-      // color by kind
-      if(kind==="success"){
-        toast.style.background = "rgba(16,185,129,.9)";
-        toast.style.borderColor = "rgba(16,185,129,.4)";
-        toast.style.color = "#ecfeff";
-      }else if(kind==="warn"){
-        toast.style.background = "rgba(245,158,11,.9)";
-        toast.style.borderColor = "rgba(245,158,11,.4)";
-        toast.style.color = "#fff7ed";
-      }else{
-        toast.style.background = "rgba(239,68,68,.9)";
-        toast.style.borderColor = "rgba(239,68,68,.4)";
-        toast.style.color = "#fee2e2";
+
+      // Reset to design-system surfaces
+      toast.style.background = "var(--card)";
+      toast.style.color = "var(--text)";
+      toast.style.borderColor = "var(--border)";
+
+      // Variant borders using allowed palette only
+      if (kind === "success") {
+        toast.style.borderColor = "rgba(163,230,53,0.60)"; // lime-400/60
+      } else if (kind === "info") {
+        toast.style.borderColor = "rgba(34,211,238,0.60)"; // cyan-400/60
+      } else if (kind === "warn") {
+        toast.style.borderColor = "rgba(241,245,249,0.25)"; // neutral outline
       }
+
       requestAnimationFrame(()=>{
         toast.classList.add("show");
         setTimeout(()=> toast.classList.remove("show"), 2200);
@@ -301,22 +302,27 @@
         el.className = "card";
         el.innerHTML = `
           <div class="title-row">
-            <h3>${w.name}</h3>
-            <div class="muted">${w.exercises.length} exercises</div>
+            <div style="display:flex; align-items:center; gap:10px">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="${'var(--primary)'}" aria-hidden="true"><path d="M1 10h3V7h2v10H4v-3H1zm19 7h-2V7h2v3h3v4h-3zM8 17H6V7h2zm8 0h-2V7h2zM9 15V9h6v6z"/></svg>
+              <h3 style="margin:0">${w.name}</h3>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center">
+              <button class="icon-btn primary" data-start="${w.id}" aria-label="Start workout from template">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="#0a0a0a" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <button class="btn secondary" data-preview="${w.id}" aria-label="Preview exercises">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12 6a9.77 9.77 0 018.94 6A9.77 9.77 0 0112 18a9.77 9.77 0 01-8.94-6A9.77 9.77 0 0112 6zm0 2C8.55 8 5.65 9.82 4.35 12 5.65 14.18 8.55 16 12 16s6.35-1.82 7.65-4C18.35 9.82 15.45 8 12 8zm0 2a2 2 0 110 4 2 2 0 010-4z"/></svg>
+              </button>
+            </div>
           </div>
           <div class="badges">
             ${w.muscles.map(m => `<span class="badge">${m}</span>`).join("")}
           </div>
-          ${last ? `<div class="last-performed">Last performed: ${fmtDate(last)}</div>` : `<div class="muted ghost">Not performed yet</div>`}
-          <div class="actions">
-            <button class="btn" data-start="${w.id}" title="Start this workout">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-              <span class="btn-text">Start Workout</span>
-            </button>
-            <button class="btn secondary" data-preview="${w.id}" title="Preview exercises">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 6a9.77 9.77 0 018.94 6A9.77 9.77 0 0112 18a9.77 9.77 0 01-8.94-6A9.77 9.77 0 0112 6zm0 2C8.55 8 5.65 9.82 4.35 12 5.65 14.18 8.55 16 12 16s6.35-1.82 7.65-4C18.35 9.82 15.45 8 12 8zm0 2a2 2 0 110 4 2 2 0 010-4z"/></svg>
-              <span class="btn-text">Preview</span>
-            </button>
+          <div style="display:flex; align-items:center; gap:14px; margin-top:8px">
+            <span style="display:inline-flex; align-items:center; gap:6px" class="muted">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12 1a11 11 0 1011 11A11.012 11.012 0 0012 1zm1 11H7V11h5V6h1z"/></svg>
+              ${last ? `Last: ${fmtDate(last)}` : `Not performed yet`}
+            </span>
           </div>
         `;
         grid.appendChild(el);
@@ -324,6 +330,67 @@
     }
 
     function getTemplateById(tid){ return WORKOUT_TEMPLATES.find(w => w.id === tid); }
+
+    /**
+     * Show a modal preview of a workout template.
+     * Builds a lightweight modal DOM and inserts into document.body.
+     */
+    function showTemplatePreview(tid){
+      const t = getTemplateById(tid);
+      if(!t) return;
+      // Remove existing preview if present
+      const existing = document.getElementById('templatePreviewModal');
+      if(existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'templatePreviewModal';
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content" role="dialog" aria-labelledby="templatePreviewTitle" style="max-width:640px">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+            <h3 id="templatePreviewTitle" style="margin:0">${t.name}</h3>
+            <button id="closeTemplatePreview" class="btn secondary" aria-label="Close preview">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div style="margin-top:8px; color:var(--muted)">Muscles: ${t.muscles.join(', ')}</div>
+          <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow:auto; padding-right:8px">
+            ${t.exercises.map(ex => `
+              <div style="display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2)">
+                <div style="width:36px; height:36px; border-radius:8px; background:var(--card); display:grid; place-items:center; font-weight:700; color:var(--text)">${(ex.name||'')[0] || '?'}</div>
+                <div style="flex:1">
+                  <div style="font-weight:700; color:var(--text)">${ex.name}</div>
+                  <div style="color:var(--muted); font-size:13px; margin-top:4px">${ex.muscle} • ${ex.defaultSets || ''} sets ${ex.defaultReps ? `• ${ex.defaultReps} reps` : ''}</div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center">
+                    ${ex.exercise_link ? `<a href="${ex.exercise_link}" target="_blank" rel="noopener" class="icon-btn" style="width:32px;height:32px;border-radius:8px" aria-label="Open demo">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3zM5 5h5v2H6v11h11v-4h2v6H5V5z"/></svg>
+                    </a>` : ''}
+                  </div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px">
+            <button id="startFromPreview" class="btn" data-start="${t.id}">Start Workout</button>
+            <button id="closePreviewFooter" class="btn secondary">Close</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      // Wire up close and start actions
+      modal.querySelectorAll('#closeTemplatePreview, #closePreviewFooter').forEach(btn=>{
+        btn.addEventListener('click', ()=> modal.remove());
+      });
+      const startBtn = modal.querySelector('#startFromPreview');
+      if(startBtn){
+        startBtn.addEventListener('click', () => {
+          const tid = startBtn.getAttribute('data-start');
+          modal.remove();
+          startWorkoutFromTemplate(tid);
+        });
+      }
+    }
 
     function startWorkoutFromTemplate(tid){
       const t = getTemplateById(tid);
@@ -1151,11 +1218,10 @@ Keep everything minimal and actionable.`;
         }
         const prevBtn = e.target.closest("[data-preview]");
         if(prevBtn){
-          const t = getTemplateById(prevBtn.getAttribute("data-preview"));
-          if(t){
-            const lines = t.exercises.map(ex => `• ${ex.name} — ${ex.muscle}`).join("\n");
-            alert(`${t.name}\n\n${lines}`);
-          }
+          // Show preview modal for this template id
+          const tid = prevBtn.getAttribute("data-preview");
+          showTemplatePreview(tid);
+          return;
         }
       });
 
@@ -1185,6 +1251,18 @@ Keep everything minimal and actionable.`;
         document.getElementById('generateModal').style.display = 'none';
       });
       document.getElementById('generateBtn').addEventListener('click', generateCustomWorkout);
+
+      // Suggested prompts (chips)
+      const promptSuggestionWrap = document.getElementById('promptSuggestions');
+      if (promptSuggestionWrap) {
+        promptSuggestionWrap.addEventListener('click', (e) => {
+          const chip = e.target.closest('[data-suggest-prompt]');
+          if (!chip) return;
+          const val = chip.getAttribute('data-suggest-prompt') || '';
+          const input = document.getElementById('workoutDescription');
+          if (input) input.value = val;
+        });
+      }
 
       // Workout summary modal
       const closeSummaryBtn = document.getElementById('closeSummaryModal');
