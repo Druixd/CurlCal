@@ -118,6 +118,22 @@
         </div>
         <div id="detailsList"></div>
       </div>
+
+      <!-- Workout Detail Modal (shows full breakdown when a saved workout is clicked in calendar) -->
+      <div id="workoutDetailModal" class="modal" style="display:none">
+        <div class="modal-content" role="dialog" aria-labelledby="workoutDetailTitle" style="max-width:720px">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+            <h3 id="workoutDetailTitle" style="margin:0">Workout</h3>
+            <button id="closeWorkoutDetail" class="btn secondary" aria-label="Close workout detail">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div id="workoutDetailBody" style="margin-top:12px; display:flex; flex-direction:column; gap:12px; max-height:65vh; overflow:auto"></div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px">
+            <button id="closeWorkoutDetailFooter" class="btn secondary">Close</button>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 

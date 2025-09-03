@@ -931,7 +931,7 @@
       const title = document.getElementById("detailsTitle");
       const summary = document.getElementById("detailsSummary");
       const list = document.getElementById("detailsList");
-
+    
       if(!dateKey){
         box.hidden = true;
         title.textContent = "Date";
@@ -939,18 +939,18 @@
         list.innerHTML = "";
         return;
       }
-
+    
       const items = history.filter(h => h.dateKey === dateKey);
       title.textContent = fmtDate(dateKey);
       summary.textContent = `${items.length} workout${items.length !== 1 ? "s" : ""}`;
-
+    
+      // Render each saved workout as a clickable card that opens the detail modal
       list.innerHTML = items.map(r => {
         const totalSets = r.exercises.reduce((a, ex) => a + (ex.sets?.length || 0), 0);
         const doneSets = r.exercises.reduce((a, ex) => a + (ex.sets?.filter(s => s.completed).length || 0), 0);
         const parts = r.exercises.map(ex => {
           const sz = ex.sets?.length || 0;
           const dz = ex.sets?.filter(s => s.completed).length || 0;
-          // Check if this exercise has time/distance data
           const hasTimeDistance = ex.sets?.some(s => s.time || s.distance);
           if (hasTimeDistance) {
             const totalTime = ex.sets?.reduce((sum, s) => sum + (s.time || 0), 0) || 0;
@@ -962,19 +962,157 @@
           }
           return `${ex.name} (${dz}/${sz})`;
         }).join(" • ");
+    
+        // data-id to identify the record when clicked
         return `
-          <div class="workout-item">
-            <div class="row">
-              <div>${r.name}</div>
-              <div class="muted">${r.minutes} min</div>
+          <button class="workout-item" data-workout-id="${r.id}" style="text-align:left; border: none; background: transparent; padding:0;">
+            <div style="border:1px solid var(--border); border-radius:8px; padding:12px; background:var(--panel-2); display:flex; flex-direction:column; gap:8px">
+              <div class="row" style="display:flex; align-items:center; justify-content:space-between">
+                <div style="font-weight:700">${r.name}</div>
+                <div class="muted">${r.minutes} min</div>
+              </div>
+              <div class="summary-sets">${doneSets}/${totalSets} sets completed</div>
+              <div class="muted" style="font-size:12px">${parts}</div>
             </div>
-            <div class="summary-sets">${doneSets}/${totalSets} sets completed</div>
-            <div class="muted" style="font-size:12px">${parts}</div>
-          </div>
+          </button>
         `;
       }).join("");
-
+    
       box.hidden = false;
+    
+      // Wire up click handlers to open the modal with full details
+      list.querySelectorAll('.workout-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const wid = btn.getAttribute('data-workout-id');
+          const record = history.find(h => h.id === wid);
+          if (!record) return;
+    
+          const modal = document.getElementById('workoutDetailModal');
+          const titleEl = document.getElementById('workoutDetailTitle');
+          const body = document.getElementById('workoutDetailBody');
+    
+          titleEl.textContent = `${record.name} — ${fmtDate(record.dateKey)}`;
+    
+          // Build breakdown
+          body.innerHTML = '';
+          const meta = document.createElement('div');
+          meta.className = 'muted';
+          meta.textContent = `${record.minutes} minutes • ${record.exercises.length} exercise${record.exercises.length !== 1 ? 's' : ''}`;
+          body.appendChild(meta);
+    
+          record.exercises.forEach(ex => {
+            const exWrap = document.createElement('div');
+            exWrap.style.border = '1px solid var(--border)';
+            exWrap.style.borderRadius = '8px';
+            exWrap.style.padding = '10px';
+            exWrap.style.background = 'var(--panel)';
+            exWrap.style.marginTop = '8px';
+    
+            const exHeader = document.createElement('div');
+            exHeader.style.display = 'flex';
+            exHeader.style.justifyContent = 'space-between';
+            exHeader.style.alignItems = 'center';
+            exHeader.innerHTML = `<div style="font-weight:700">${ex.name}</div><div class="muted">${ex.muscle}</div>`;
+            exWrap.appendChild(exHeader);
+    
+            const setList = document.createElement('div');
+            setList.style.marginTop = '8px';
+            setList.style.display = 'flex';
+            setList.style.flexDirection = 'column';
+            setList.style.gap = '6px';
+    
+            (ex.sets || []).forEach((s, i) => {
+              const setEl = document.createElement('div');
+              setEl.style.display = 'flex';
+              setEl.style.justifyContent = 'space-between';
+              setEl.style.alignItems = 'center';
+              setEl.style.gap = '8px';
+    
+              const left = document.createElement('div');
+              left.textContent = `Set ${i+1}`;
+              left.style.fontWeight = '600';
+    
+              const right = document.createElement('div');
+              right.className = 'muted';
+              if ('time' in s || 'distance' in s) {
+                const timeStr = s.time ? `${s.time}min` : '';
+                const distStr = s.distance ? `${s.distance}km` : '';
+                right.textContent = [timeStr, distStr].filter(Boolean).join(' / ') || (s.completed ? 'Done' : '—');
+              } else {
+                right.textContent = `${s.weight || 0}kg × ${s.reps || 0} reps ${s.completed ? '• ✔' : ''}`;
+              }
+    
+              setEl.appendChild(left);
+              setEl.appendChild(right);
+              setList.appendChild(setEl);
+            });
+    
+            exWrap.appendChild(setList);
+            body.appendChild(exWrap);
+          });
+    
+          // Ensure share button exists in modal footer (create if missing)
+          const modalContent = modal.querySelector('.modal-content');
+          let footer = modalContent.querySelector('.modal-footer');
+          if (!footer) {
+            footer = document.createElement('div');
+            footer.className = 'modal-footer';
+            footer.style.display = 'flex';
+            footer.style.gap = '8px';
+            footer.style.justifyContent = 'flex-end';
+            footer.style.marginTop = '12px';
+            // append before the close button container if present
+            modalContent.appendChild(footer);
+          } else {
+            footer.innerHTML = '';
+          }
+    
+          // Share button
+          const shareBtn = document.createElement('button');
+          shareBtn.className = 'btn';
+          shareBtn.id = 'shareWorkoutBtn';
+          shareBtn.textContent = 'Share';
+          shareBtn.addEventListener('click', () => {
+            // Build a concise share text
+            const parts = [];
+            parts.push(`${record.name} • ${record.minutes} min • ${record.exercises.length} exercises`);
+            record.exercises.forEach(ex => {
+              const sets = (ex.sets || []).map(s => {
+                if ('time' in s || 'distance' in s) {
+                  return `${s.time || 0}min/${s.distance || 0}km`;
+                }
+                return `${s.weight || 0}kg×${s.reps || 0}`;
+              }).join(', ');
+              parts.push(`${ex.name}: ${sets}`);
+            });
+            const text = parts.join('\n');
+            if (navigator.share) {
+              navigator.share({ title: record.name, text }).catch(()=>{/* ignore */});
+            } else {
+              // fallback copy to clipboard
+              navigator.clipboard?.writeText(text).then(()=> showToast('Workout copied to clipboard'), ()=> showToast('Copy failed','error'));
+            }
+          });
+    
+          // Close button (ensure also present)
+          const closeFooterBtn = document.createElement('button');
+          closeFooterBtn.className = 'btn secondary';
+          closeFooterBtn.textContent = 'Close';
+          closeFooterBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+          });
+    
+          footer.appendChild(shareBtn);
+          footer.appendChild(closeFooterBtn);
+    
+          // Show modal
+          modal.style.display = 'flex';
+    
+          // Wire up top-right close (if present)
+          const topClose = document.getElementById('closeWorkoutDetail');
+          if (topClose) topClose.onclick = () => { modal.style.display = 'none'; };
+        });
+      });
     }
 
     function removeIncompleteSets(){
