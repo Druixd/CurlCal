@@ -403,7 +403,7 @@ const COMPREHENSIVE_EXERCISES = [
  { name: "Seated Calf Raises", muscle: "Legs", defaultSets: 4, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/machine-seated-calf-raise" },
 
  // Core Exercises
- { name: "Plank", muscle: "Core", defaultSets: 3, defaultReps: 60, exercise_link: "https://musclewiki.com/exercise/plank" },
+ { name: "Plank", muscle: "Core", defaultSets: 3, defaultReps: 60, exercise_link: "https://musclewiki.com/exercise/plank", trackingType: "time_distance" },
  { name: "Russian Twists", muscle: "Core", defaultSets: 3, defaultReps: 20, exercise_link: "https://musclewiki.com/exercise/russian-twist" },
  { name: "Bicycle Crunches", muscle: "Core", defaultSets: 3, defaultReps: 20, exercise_link: "https://musclewiki.com/exercise/bicycle-crunch" },
  { name: "Crunches", muscle: "Core", defaultSets: 3, defaultReps: 20, exercise_link: "https://musclewiki.com/exercise/crunch" },

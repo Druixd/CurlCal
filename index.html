@@ -73,7 +73,7 @@
       </div>
       <div class="sticky-actions" id="workoutActions" style="display:none">
         <button class="btn secondary" id="breakBtn" title="Start break timer">
-          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/><path d="M10 2h4"/><path d="M6 4h2"/><path d="M16 4h2"/></svg>
           <span class="btn-text">Break</span>
         </button>
         <div id="workoutTimer" class="muted">00:00</div>
@@ -124,14 +124,11 @@
         <div class="modal-content" role="dialog" aria-labelledby="workoutDetailTitle" style="max-width:720px">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
             <h3 id="workoutDetailTitle" style="margin:0">Workout</h3>
-            <button id="closeWorkoutDetail" class="btn secondary" aria-label="Close workout detail">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            </button>
           </div>
           <div id="workoutDetailBody" style="margin-top:12px; display:flex; flex-direction:column; gap:12px; max-height:65vh; overflow:auto"></div>
-          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px">
+          <!-- <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px">
             <button id="closeWorkoutDetailFooter" class="btn secondary">Close</button>
-          </div>
+          </div> -->
         </div>
       </div>
     </section>
@@ -156,6 +153,12 @@
           <option value="120">120</option>
           <option value="180">180</option>
         </select>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer">
+          <input type="checkbox" id="autoRestTimerToggle" checked>
+          <span>Auto-start rest timer after completing a set</span>
+        </label>
       </div>
       <button id="saveApiKeyBtn" class="btn">Save Settings</button>
       <button id="logoutBtn" class="btn">Logout</button>
@@ -232,6 +235,50 @@
         </label>
       </div>
       <div id="exerciseSelectorGrid" class="grid" style="max-height:400px; overflow-y:auto; margin-bottom:16px"></div>
+      <div style="margin-bottom:16px">
+        <button id="toggleCustomExerciseFormBtn" class="btn secondary" style="width:100%">Create Custom Exercise</button>
+        <div id="customExerciseForm" style="display:none; margin-top:16px; padding:16px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2)">
+          <div style="margin-bottom:12px">
+            <label for="customNameSelector" style="display:block; margin-bottom:4px">Exercise Name:</label>
+            <input type="text" id="customNameSelector" class="input-field" placeholder="e.g., Push-ups">
+          </div>
+          <div style="margin-bottom:12px">
+            <label for="customMuscleSelector" style="display:block; margin-bottom:4px">Muscle Group:</label>
+            <select id="customMuscleSelector" class="input-field">
+              <option value="Chest">Chest</option>
+              <option value="Back">Back</option>
+              <option value="Legs">Legs</option>
+              <option value="Shoulders">Shoulders</option>
+              <option value="Arms">Arms</option>
+              <option value="Core">Core</option>
+              <option value="Full Body">Full Body</option>
+            </select>
+          </div>
+          <div style="margin-bottom:12px">
+            <label for="customTrackingTypeSelector" style="display:block; margin-bottom:4px">Tracking Type:</label>
+            <select id="customTrackingTypeSelector" class="input-field">
+              <option value="weight_reps">Weight & Reps</option>
+              <option value="time_distance">Time & Distance</option>
+            </select>
+          </div>
+          <div style="margin-bottom:12px">
+            <label for="customDefaultSetsSelector" style="display:block; margin-bottom:4px">Default Sets:</label>
+            <input type="number" id="customDefaultSetsSelector" class="input-field" value="3" min="1">
+          </div>
+          <div style="margin-bottom:12px">
+            <label for="customDefaultRepsSelector" style="display:block; margin-bottom:4px">Default Reps:</label>
+            <input type="number" id="customDefaultRepsSelector" class="input-field" value="10" min="1">
+          </div>
+          <div style="margin-bottom:12px">
+            <label for="customLinkSelector" style="display:block; margin-bottom:4px">Exercise Link (optional):</label>
+            <input type="url" id="customLinkSelector" class="input-field" placeholder="https://example.com">
+          </div>
+          <div style="display:flex; gap:8px; justify-content:flex-end">
+            <button id="saveCustomExerciseSelectorBtn" class="btn">Create & Add</button>
+            <button id="cancelCustomExerciseSelectorBtn" class="btn secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
       <div style="display:flex; gap:8px; justify-content:flex-end">
         <button id="addSelectedExercisesBtn" class="btn">Add Selected</button>
         <button id="cancelExerciseSelectorBtn" class="btn secondary">Cancel</button>
@@ -261,6 +308,7 @@
       <button id="cancelExerciseOptionsBtn" class="btn secondary">Cancel</button>
     </div>
   </div>
+
 
   <div id="breakModal" class="modal" style="display:none">
     <div class="modal-content">

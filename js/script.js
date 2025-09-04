@@ -17,6 +17,8 @@
         document.getElementById('loginBtn').onclick = () => {
           document.getElementById('apiKeyInput').value = loadApiKey();
           document.getElementById('breakDurationSelect').value = loadBreakDuration().toString();
+          document.getElementById('autoRestTimerToggle').checked = loadAutoRest();
+          document.getElementById('apiKeyMessage').style.display = loadApiKey() ? 'none' : 'block';
           document.getElementById('userModal').style.display = 'flex';
         };
         // Load user data
@@ -80,6 +82,8 @@
     const LS_ACTIVE  = "GYM_ACTIVE_WORKOUT_V1";
     const LS_API_KEY = "GYM_GEMINI_API_KEY_V1";
     const LS_BREAK_DURATION = "GYM_BREAK_DURATION_V1";
+    const LS_AUTO_REST = "GYM_AUTO_REST_V1";
+    const LS_EXERCISE_PREFS = "GYM_EXERCISE_PREFS_V1";
 
     // Use comprehensive exercise database
     const ALL_EXERCISES = COMPREHENSIVE_EXERCISES.map(ex => ({
@@ -188,6 +192,31 @@
     }
     function saveBreakDuration(duration){
       localStorage.setItem(LS_BREAK_DURATION, duration.toString());
+    }
+
+    // Auto rest timer utilities
+    function loadAutoRest(){
+      return localStorage.getItem(LS_AUTO_REST) !== "false"; // default true
+    }
+    function saveAutoRest(enabled){
+      localStorage.setItem(LS_AUTO_REST, enabled.toString());
+    }
+
+    // Exercise preferences utilities
+    function loadExercisePrefs(){
+      try{ return JSON.parse(localStorage.getItem(LS_EXERCISE_PREFS) || "{}"); }catch{ return {} }
+    }
+    function saveExercisePrefs(prefs){
+      localStorage.setItem(LS_EXERCISE_PREFS, JSON.stringify(prefs));
+    }
+    function getExercisePref(exerciseName){
+      const prefs = loadExercisePrefs();
+      return prefs[exerciseName] || {};
+    }
+    function setExercisePref(exerciseName, pref){
+      const prefs = loadExercisePrefs();
+      prefs[exerciseName] = pref;
+      saveExercisePrefs(prefs);
     }
 
     function startBreakTimer(){
@@ -407,18 +436,25 @@
         name: t.name,
         muscles: [...t.muscles],
         startTime: new Date().toISOString(),
-        exercises: t.exercises.map(ex => ({
-          name: ex.name,
-          muscle: ex.muscle,
-          exercise_link: ex.exercise_link,
-          trackingType: ex.trackingType || "weight_reps",
-          sets: Array.from({ length: ex.defaultSets }, () => {
-            const isTimeDistance = ex.trackingType === "time_distance";
-            return isTimeDistance
-              ? { time: 0, distance: 0, completed: false }
-              : { weight: 0, reps: ex.defaultReps, completed: false };
-          })
-        }))
+        exercises: t.exercises.map(ex => {
+          const pref = getExercisePref(ex.name);
+          const isTimeDistance = ex.trackingType === "time_distance";
+          return {
+            name: ex.name,
+            muscle: ex.muscle,
+            exercise_link: ex.exercise_link,
+            trackingType: ex.trackingType || "weight_reps",
+            sets: Array.from({ length: pref.lastSets || ex.defaultSets }, () => {
+              if(ex.name === 'Plank'){
+                return { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
+              } else if(isTimeDistance){
+                return { time: pref.lastTime || 0, distance: pref.lastDistance || 0, completed: false };
+              } else {
+                return { weight: pref.lastWeight || 0, reps: pref.lastReps || ex.defaultReps, completed: false };
+              }
+            })
+          };
+        })
       };
       saveActiveWorkout();
       updateResumeChip();
@@ -482,7 +518,7 @@
               <div>
                 <div style="display:flex; align-items:center; gap:8px">
                   <button class="exercise-link-btn" data-link="${ex.exercise_link || '#'}" title="View Exercise Demo">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M8 5v14l11-7z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                   </button>
                   <div>
                     <div class="name exercise-name-btn" data-ex="${ei}">${ex.name}</div>
@@ -505,7 +541,10 @@
               ${(ex.sets||[]).map((s, si)=>`
                 <div class="set" data-ex="${ei}" data-set="${si}">
                   <div class="index set-index-btn" data-ei="${ei}" data-si="${si}">${si+1}</div>
-                  ${isTimeDistance ? `
+                  ${ex.name === 'Plank' ? `
+                    <input type="number" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
+                    <input type="number" inputmode="numeric" step="1" placeholder="Time (sec)" value="${s.time ?? ''}" data-time />
+                  ` : isTimeDistance ? `
                     <input type="number" inputmode="decimal" step="0.1" placeholder="Time (min)" value="${s.time ?? ''}" data-time />
                     <input type="number" inputmode="decimal" step="0.1" placeholder="Distance (km)" value="${s.distance ?? ''}" data-distance />
                   ` : `
@@ -636,10 +675,16 @@
       if(!activeWorkout) return;
       const ex = activeWorkout.exercises[ei];
       if(!ex.sets) ex.sets = [];
+      const pref = getExercisePref(ex.name);
       const isTimeDistance = ex.trackingType === "time_distance";
-      const newSet = isTimeDistance
-        ? { time: 0, distance: 0, completed: false }
-        : { weight: 0, reps: 0, completed: false };
+      let newSet;
+      if(ex.name === 'Plank'){
+        newSet = { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
+      } else if(isTimeDistance){
+        newSet = { time: pref.lastTime || 0, distance: pref.lastDistance || 0, completed: false };
+      } else {
+        newSet = { weight: pref.lastWeight || 0, reps: pref.lastReps || 0, completed: false };
+      }
       ex.sets.push(newSet);
       saveActiveWorkout();
       renderWorkout();
@@ -659,8 +704,8 @@
       btnEl.innerHTML = s.completed ? "&#10003;" : "";
       updateWorkoutProgressBar();
 
-      // Auto-trigger break if set is completed
-      if(s.completed){
+      // Auto-trigger break if set is completed and auto rest is enabled
+      if(s.completed && loadAutoRest()){
         startBreakTimer();
       }
     }
@@ -739,15 +784,25 @@
           muscle: ex.muscle,
           sets: ex.sets.filter(s => s.reps || s.weight || s.time || s.distance || s.completed).map(s => {
             const isTimeDistance = ex.trackingType === "time_distance";
-            return isTimeDistance ? {
-              time: Number(s.time || 0),
-              distance: Number(s.distance || 0),
-              completed: !!s.completed
-            } : {
-              weight: Number(s.weight || 0),
-              reps: Number(s.reps || 0),
-              completed: !!s.completed
-            };
+            if(ex.name === 'Plank'){
+              return {
+                weight: Number(s.weight || 0),
+                time: Number(s.time || 0),
+                completed: !!s.completed
+              };
+            } else if(isTimeDistance){
+              return {
+                time: Number(s.time || 0),
+                distance: Number(s.distance || 0),
+                completed: !!s.completed
+              };
+            } else {
+              return {
+                weight: Number(s.weight || 0),
+                reps: Number(s.reps || 0),
+                completed: !!s.completed
+              };
+            }
           })
         }))
       };
@@ -756,6 +811,22 @@
 
       // Generate AI summary
       generateWorkoutSummary(record);
+
+      // Update exercise preferences
+      activeWorkout.exercises.forEach(ex => {
+        const completedSets = ex.sets.filter(s => s.completed);
+        if(completedSets.length > 0){
+          const lastSet = completedSets[completedSets.length - 1];
+          const pref = {
+            lastSets: ex.sets.length,
+            lastWeight: lastSet.weight || 0,
+            lastReps: lastSet.reps || 0,
+            lastTime: lastSet.time || 0,
+            lastDistance: lastSet.distance || 0
+          };
+          setExercisePref(ex.name, pref);
+        }
+      });
 
       // Clear active
       activeWorkout = null;
@@ -845,17 +916,22 @@
 
       const exercisesToAdd = Array.from(selectedExercises).map(name => {
         const ex = ALL_EXERCISES.find(e => e.name === name);
+        const pref = getExercisePref(ex.name);
         const isTimeDistance = ex.trackingType === "time_distance";
         return {
           name: ex.name,
           muscle: ex.muscle,
           exercise_link: ex.exercise_link,
           trackingType: ex.trackingType || "weight_reps",
-          sets: Array.from({ length: ex.defaultSets }, () => (
-            isTimeDistance
-              ? { time: 0, distance: 0, completed: false }
-              : { weight: 0, reps: ex.defaultReps, completed: false }
-          ))
+          sets: Array.from({ length: pref.lastSets || ex.defaultSets }, () => {
+            if(ex.name === 'Plank'){
+              return { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
+            } else if(isTimeDistance){
+              return { time: pref.lastTime || 0, distance: pref.lastDistance || 0, completed: false };
+            } else {
+              return { weight: pref.lastWeight || 0, reps: pref.lastReps || ex.defaultReps, completed: false };
+            }
+          })
         };
       });
 
@@ -952,7 +1028,14 @@
           const sz = ex.sets?.length || 0;
           const dz = ex.sets?.filter(s => s.completed).length || 0;
           const hasTimeDistance = ex.sets?.some(s => s.time || s.distance);
-          if (hasTimeDistance) {
+          if (ex.name === 'Plank') {
+            const totalTime = ex.sets?.reduce((sum, s) => sum + (s.time || 0), 0) || 0;
+            const totalWeight = ex.sets?.reduce((sum, s) => sum + (s.weight || 0), 0) || 0;
+            const timeStr = totalTime > 0 ? `${totalTime}s` : '';
+            const weightStr = totalWeight > 0 ? `${totalWeight}kg` : '';
+            const metrics = [weightStr, timeStr].filter(Boolean).join('/');
+            return `${ex.name} (${dz}/${sz}${metrics ? ` - ${metrics}` : ''})`;
+          } else if (hasTimeDistance) {
             const totalTime = ex.sets?.reduce((sum, s) => sum + (s.time || 0), 0) || 0;
             const totalDistance = ex.sets?.reduce((sum, s) => sum + (s.distance || 0), 0) || 0;
             const timeStr = totalTime > 0 ? `${totalTime}min` : '';
@@ -1034,7 +1117,11 @@
     
               const right = document.createElement('div');
               right.className = 'muted';
-              if ('time' in s || 'distance' in s) {
+              if (ex.name === 'Plank') {
+                const weightStr = s.weight ? `${s.weight}kg` : '';
+                const timeStr = s.time ? `${s.time}s` : '';
+                right.textContent = [weightStr, timeStr].filter(Boolean).join(' / ') || (s.completed ? 'Done' : '—');
+              } else if ('time' in s || 'distance' in s) {
                 const timeStr = s.time ? `${s.time}min` : '';
                 const distStr = s.distance ? `${s.distance}km` : '';
                 right.textContent = [timeStr, distStr].filter(Boolean).join(' / ') || (s.completed ? 'Done' : '—');
@@ -1078,7 +1165,9 @@
             parts.push(`${record.name} • ${record.minutes} min • ${record.exercises.length} exercises`);
             record.exercises.forEach(ex => {
               const sets = (ex.sets || []).map(s => {
-                if ('time' in s || 'distance' in s) {
+                if (ex.name === 'Plank') {
+                  return `${s.weight || 0}kg/${s.time || 0}s`;
+                } else if ('time' in s || 'distance' in s) {
                   return `${s.time || 0}min/${s.distance || 0}km`;
                 }
                 return `${s.weight || 0}kg×${s.reps || 0}`;
@@ -1107,10 +1196,6 @@
     
           // Show modal
           modal.style.display = 'flex';
-    
-          // Wire up top-right close (if present)
-          const topClose = document.getElementById('closeWorkoutDetail');
-          if (topClose) topClose.onclick = () => { modal.style.display = 'none'; };
         });
       });
     }
@@ -1135,7 +1220,6 @@
       }
       const apiKey = loadApiKey();
       if (!apiKey) {
-        document.getElementById('apiKeyMessage').style.display = 'block';
         document.getElementById('userModal').style.display = 'flex';
         return;
       }
@@ -1283,6 +1367,7 @@ Keep everything minimal and actionable.`;
       document.getElementById('summaryModal').style.display = 'flex';
     }
 
+
     // ===== Event Bindings and Initialization =====
     function bindEvents(){
       // Tabs
@@ -1301,10 +1386,13 @@ Keep everything minimal and actionable.`;
         document.getElementById('saveApiKeyBtn').addEventListener('click', () => {
           const key = document.getElementById('apiKeyInput').value.trim();
           const breakDurationValue = parseInt(document.getElementById('breakDurationSelect').value);
+          const autoRestEnabled = document.getElementById('autoRestTimerToggle').checked;
           saveApiKey(key);
           saveBreakDuration(breakDurationValue);
+          saveAutoRest(autoRestEnabled);
           breakDuration = breakDurationValue;
           document.getElementById('apiKeyMessage').style.display = 'none';
+          document.getElementById('userModal').style.display = 'none';
           showToast('Settings saved');
         });
 
@@ -1345,6 +1433,12 @@ Keep everything minimal and actionable.`;
       // Library search
       const search = document.getElementById("searchInput");
       search.addEventListener("input", renderLibrary);
+
+      // Toggle custom exercise form in selector
+      document.getElementById("toggleCustomExerciseFormBtn").addEventListener("click", () => {
+        const form = document.getElementById('customExerciseForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      });
 
       // Library actions (delegated)
       const grid = document.getElementById("libraryGrid");
@@ -1437,6 +1531,52 @@ Keep everything minimal and actionable.`;
         selectedExercises.clear();
       });
 
+      // Custom exercise in selector
+      document.getElementById('saveCustomExerciseSelectorBtn').addEventListener('click', () => {
+        const name = document.getElementById('customNameSelector').value.trim();
+        const muscle = document.getElementById('customMuscleSelector').value;
+        const trackingType = document.getElementById('customTrackingTypeSelector').value;
+        const defaultSets = parseInt(document.getElementById('customDefaultSetsSelector').value) || 3;
+        const defaultReps = parseInt(document.getElementById('customDefaultRepsSelector').value) || 10;
+        const exercise_link = document.getElementById('customLinkSelector').value.trim() || '';
+
+        if (!name) {
+          showToast('Please enter an exercise name', 'warn');
+          return;
+        }
+
+        // Create the exercise object
+        const newExercise = {
+          name,
+          muscle,
+          defaultSets,
+          defaultReps,
+          exercise_link,
+          trackingType,
+          muscles: [muscle] // For consistency
+        };
+
+        // Add to ALL_EXERCISES
+        ALL_EXERCISES.push(newExercise);
+
+        // Add to selected exercises
+        selectedExercises.add(name);
+
+        // Clear form
+        document.getElementById('customNameSelector').value = '';
+        document.getElementById('customLinkSelector').value = '';
+        document.getElementById('customExerciseForm').style.display = 'none';
+
+        // Re-render the selector grid to show the new exercise
+        renderExerciseSelector();
+
+        showToast('Custom exercise created and selected!');
+      });
+
+      document.getElementById('cancelCustomExerciseSelectorBtn').addEventListener('click', () => {
+        document.getElementById('customExerciseForm').style.display = 'none';
+      });
+
       // Exercise options modal
       document.getElementById('previewExerciseBtn').addEventListener('click', () => {
         if (selectedExerciseIndex !== null && activeWorkout) {
@@ -1478,6 +1618,7 @@ Keep everything minimal and actionable.`;
       if (breakPlus30) breakPlus30.addEventListener('click', () => modifyBreakTime(30));
       const closeBreakModal = document.getElementById('closeBreakModal');
       if (closeBreakModal) closeBreakModal.addEventListener('click', endBreakTimer);
+
 
       // Global click to revert active delete set
       document.addEventListener('click', (e) => {
