@@ -18,7 +18,13 @@
           document.getElementById('apiKeyInput').value = loadApiKey();
           document.getElementById('breakDurationSelect').value = loadBreakDuration().toString();
           document.getElementById('autoRestTimerToggle').checked = loadAutoRest();
+          document.getElementById('weightInput').value = loadUserWeight().toString();
+          document.getElementById('heightInput').value = loadUserHeight().toString();
           document.getElementById('apiKeyMessage').style.display = loadApiKey() ? 'none' : 'block';
+
+          // Update BMR display
+          const bmr = calculateBMR();
+          document.getElementById('bmrDisplay').textContent = `BMR: ${bmr} cal/day • Weight: ${loadUserWeight()}kg • Height: ${loadUserHeight()}ft`;
           document.getElementById('userModal').style.display = 'flex';
         };
         // Load user data
@@ -43,10 +49,27 @@
       auth.signInWithPopup(provider)
         .then((result) => {
           showToast('Logged in successfully');
+          // Try to close popup window if it exists
+          try {
+            if (window.opener) {
+              window.close();
+            }
+          } catch (e) {
+            // Ignore Cross-Origin-Opener-Policy errors
+            console.log('Popup close blocked by browser policy');
+          }
         })
         .catch((error) => {
           console.error('Login error:', error);
           showToast('Login failed', 'error');
+          // Try to close popup window on error too
+          try {
+            if (window.opener) {
+              window.close();
+            }
+          } catch (e) {
+            // Ignore Cross-Origin-Opener-Policy errors
+          }
         });
     }
     
@@ -55,15 +78,28 @@
       try {
         const doc = await db.collection('users').doc(uid).get();
         if (doc.exists) {
-          const data = doc.data();
-          history = data.history || [];
+          const data = doc.data() || {};
+          history = Array.isArray(data.history) ? data.history : [];
           activeWorkout = data.activeWorkout || null;
+          updateResumeChip();
+          renderLibrary();
+          renderCalendar();
+        } else {
+          // First time user - initialize with empty data
+          history = [];
+          activeWorkout = null;
           updateResumeChip();
           renderLibrary();
           renderCalendar();
         }
       } catch (error) {
         console.error('Error loading user data:', error);
+        // Fallback to localStorage data
+        history = JSON.parse(localStorage.getItem(LS_HISTORY) || "[]");
+        activeWorkout = JSON.parse(localStorage.getItem(LS_ACTIVE) || "null");
+        updateResumeChip();
+        renderLibrary();
+        renderCalendar();
       }
     }
     
@@ -71,10 +107,20 @@
     function saveUserData() {
       if (!currentUser) return;
       const data = {
-        history,
-        activeWorkout
+        history: history || [],
+        activeWorkout: activeWorkout || null
       };
-      db.collection('users').doc(currentUser.uid).set(data, { merge: true });
+      db.collection('users').doc(currentUser.uid).set(data, { merge: true })
+        .catch((error) => {
+          console.error('Error saving user data to Firestore:', error);
+          // Fallback to localStorage
+          if (activeWorkout) {
+            localStorage.setItem(LS_ACTIVE, JSON.stringify(activeWorkout));
+          } else {
+            localStorage.removeItem(LS_ACTIVE);
+          }
+          localStorage.setItem(LS_HISTORY, JSON.stringify(history || []));
+        });
     }
     
     // ===== Constants and Data =====
@@ -84,6 +130,8 @@
     const LS_BREAK_DURATION = "GYM_BREAK_DURATION_V1";
     const LS_AUTO_REST = "GYM_AUTO_REST_V1";
     const LS_EXERCISE_PREFS = "GYM_EXERCISE_PREFS_V1";
+    const LS_USER_WEIGHT = "GYM_USER_WEIGHT_V1";
+    const LS_USER_HEIGHT = "GYM_USER_HEIGHT_V1";
 
     // Use comprehensive exercise database
     const ALL_EXERCISES = COMPREHENSIVE_EXERCISES.map(ex => ({
@@ -208,6 +256,60 @@
     }
     function saveExercisePrefs(prefs){
       localStorage.setItem(LS_EXERCISE_PREFS, JSON.stringify(prefs));
+    }
+
+    // User weight utilities
+    function loadUserWeight(){
+      return parseFloat(localStorage.getItem(LS_USER_WEIGHT) || "70");
+    }
+    function saveUserWeight(weight){
+      localStorage.setItem(LS_USER_WEIGHT, weight.toString());
+    }
+
+    // User height utilities
+    function loadUserHeight(){
+      return parseFloat(localStorage.getItem(LS_USER_HEIGHT) || "5.8");
+    }
+    function saveUserHeight(height){
+      localStorage.setItem(LS_USER_HEIGHT, height.toString());
+    }
+
+    // Calorie calculation utilities
+    function calculateWorkoutCalories(workout){
+      if(!workout || !workout.exercises) return 0;
+      const userWeight = loadUserWeight();
+      let totalCalories = 0;
+
+      workout.exercises.forEach(ex => {
+        const met = ex.met || 5; // default MET if not specified
+        ex.sets.forEach(set => {
+          if(set.completed){
+            let timeHours = 0;
+            if(ex.name === 'Plank' || ex.trackingType === 'time_distance'){
+              // For time-based exercises, use actual time in hours
+              timeHours = (set.time || 0) / 60; // convert minutes to hours
+            } else {
+              // For weight/reps exercises, estimate time per set (1 minute including rest)
+              timeHours = 1 / 60;
+            }
+            totalCalories += met * userWeight * timeHours;
+          }
+        });
+      });
+
+      return Math.round(totalCalories);
+    }
+
+    // BMR calculation using Harris-Benedict equation
+    function calculateBMR(){
+      const weight = loadUserWeight(); // kg
+      const height = loadUserHeight() * 30.48; // convert feet to cm
+      const age = 30; // default age, could be made configurable later
+
+      // Harris-Benedict equation for men (could add gender selection later)
+      // BMR = 88.362 + (13.397 × weight in kg) + (4.799 × height in cm) - (5.677 × age in years)
+      const bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
+      return Math.round(bmr);
     }
     function getExercisePref(exerciseName){
       const prefs = loadExercisePrefs();
@@ -371,6 +473,17 @@
       const existing = document.getElementById('templatePreviewModal');
       if(existing) existing.remove();
 
+      // Calculate estimated calories for preview
+      const userWeight = loadUserWeight();
+      let estimatedCalories = 0;
+      t.exercises.forEach(ex => {
+        const met = ex.met || 5;
+        const sets = ex.defaultSets || 3;
+        // Assume 1 minute per set
+        estimatedCalories += met * userWeight * (sets / 60);
+      });
+      estimatedCalories = Math.round(estimatedCalories);
+
       const modal = document.createElement('div');
       modal.id = 'templatePreviewModal';
       modal.className = 'modal';
@@ -382,7 +495,7 @@
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
-          <div style="margin-top:8px; color:var(--muted)">Muscles: ${t.muscles.join(', ')}</div>
+          <div style="margin-top:8px; color:var(--muted)">Muscles: ${t.muscles.join(', ')} • Est. ${estimatedCalories} cal</div>
           <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow:auto; padding-right:8px">
             ${t.exercises.map(ex => `
               <div style="display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2)">
@@ -399,7 +512,7 @@
               </div>
             `).join('')}
           </div>
-          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px">
+          <div class="modal-footer">
             <button id="startFromPreview" class="btn" data-start="${t.id}">Start Workout</button>
             <button id="closePreviewFooter" class="btn secondary">Close</button>
           </div>
@@ -444,6 +557,7 @@
             muscle: ex.muscle,
             exercise_link: ex.exercise_link,
             trackingType: ex.trackingType || "weight_reps",
+            met: ex.met,
             sets: Array.from({ length: pref.lastSets || ex.defaultSets }, () => {
               if(ex.name === 'Plank'){
                 return { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
@@ -491,6 +605,7 @@
       startWorkoutTimer();
       const totalSets = activeWorkout.exercises.reduce((a,e)=>a+(e.sets?.length||0),0);
       const doneSets = countCompletedSets(activeWorkout);
+      const estimatedCalories = calculateWorkoutCalories(activeWorkout);
 
       let html = `
        <div class="workout-head">
@@ -502,6 +617,7 @@
          </div>
          <div style="display:flex; align-items:center; gap:10px">
            <div class="muted">${doneSets}/${totalSets} sets completed</div>
+           <div class="muted">Est. ${estimatedCalories} cal</div>
            <button class="btn secondary" id="editWorkoutBtn" title="Add exercises to workout">
              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
            </button>
@@ -771,6 +887,7 @@
 
       const endTime = new Date().toISOString();
       // Build compact summary to store
+      const calories = calculateWorkoutCalories(activeWorkout);
       const record = {
         id: activeWorkout.id,
         templateId: activeWorkout.templateId,
@@ -779,9 +896,11 @@
         startTime: activeWorkout.startTime,
         endTime,
         minutes: minutesBetween(activeWorkout.startTime, endTime),
+        calories,
         exercises: activeWorkout.exercises.map(ex => ({
           name: ex.name,
           muscle: ex.muscle,
+          met: ex.met,
           sets: ex.sets.filter(s => s.reps || s.weight || s.time || s.distance || s.completed).map(s => {
             const isTimeDistance = ex.trackingType === "time_distance";
             if(ex.name === 'Plank'){
@@ -923,6 +1042,7 @@
           muscle: ex.muscle,
           exercise_link: ex.exercise_link,
           trackingType: ex.trackingType || "weight_reps",
+          met: ex.met,
           sets: Array.from({ length: pref.lastSets || ex.defaultSets }, () => {
             if(ex.name === 'Plank'){
               return { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
@@ -1052,7 +1172,7 @@
             <div style="border:1px solid var(--border); border-radius:8px; padding:12px; background:var(--panel-2); display:flex; flex-direction:column; gap:8px">
               <div class="row" style="display:flex; align-items:center; justify-content:space-between">
                 <div style="font-weight:700">${r.name}</div>
-                <div class="muted">${r.minutes} min</div>
+                <div class="muted">${r.minutes} min • ${r.calories || 0} cal</div>
               </div>
               <div class="summary-sets">${doneSets}/${totalSets} sets completed</div>
               <div class="muted" style="font-size:12px">${parts}</div>
@@ -1074,13 +1194,13 @@
           const titleEl = document.getElementById('workoutDetailTitle');
           const body = document.getElementById('workoutDetailBody');
     
-          titleEl.textContent = `${record.name} — ${fmtDate(record.dateKey)}`;
+          titleEl.textContent = `${record.name} — ${fmtDate(record.dateKey)} • ${record.calories || 0} cal`;
     
           // Build breakdown
           body.innerHTML = '';
           const meta = document.createElement('div');
           meta.className = 'muted';
-          meta.textContent = `${record.minutes} minutes • ${record.exercises.length} exercise${record.exercises.length !== 1 ? 's' : ''}`;
+          meta.textContent = `${record.minutes} minutes • ${record.exercises.length} exercise${record.exercises.length !== 1 ? 's' : ''} • ${record.calories || 0} calories`;
           body.appendChild(meta);
     
           record.exercises.forEach(ex => {
@@ -1144,11 +1264,6 @@
           if (!footer) {
             footer = document.createElement('div');
             footer.className = 'modal-footer';
-            footer.style.display = 'flex';
-            footer.style.gap = '8px';
-            footer.style.justifyContent = 'flex-end';
-            footer.style.marginTop = '12px';
-            // append before the close button container if present
             modalContent.appendChild(footer);
           } else {
             footer.innerHTML = '';
@@ -1238,21 +1353,22 @@
 Output in JSON format with the following structure:
 
 {
- "id": "unique-id",
- "name": "Workout Name",
- "muscles": ["Muscle1", "Muscle2"],
- "exercises": [
-   {
-     "name": "Exercise Name",
-     "muscle": "Muscle",
-     "defaultSets": 3,
-     "defaultReps": 10,
-     "exercise_link": "https://musclewiki.com/exercise/example"
-   }
- ]
+  "id": "unique-id",
+  "name": "Workout Name",
+  "muscles": ["Muscle1", "Muscle2"],
+  "exercises": [
+    {
+      "name": "Exercise Name",
+      "muscle": "Muscle",
+      "defaultSets": 3,
+      "defaultReps": 10,
+      "exercise_link": "https://musclewiki.com/exercise/example",
+      "met": 6
+    }
+  ]
 }
 
-Make sure the exercises are real and have valid musclewiki links. ${countInstruction}`;
+Make sure the exercises are real and have valid musclewiki links. Include appropriate MET (Metabolic Equivalent of Task) values for calorie estimation. ${countInstruction}`;
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: prompt,
@@ -1273,9 +1389,10 @@ Make sure the exercises are real and have valid musclewiki links. ${countInstruc
                       muscle: { type: 'string' },
                       defaultSets: { type: 'number' },
                       defaultReps: { type: 'number' },
-                      exercise_link: { type: 'string' }
+                      exercise_link: { type: 'string' },
+                      met: { type: 'number' }
                     },
-                    required: ['name', 'muscle', 'defaultSets', 'defaultReps', 'exercise_link']
+                    required: ['name', 'muscle', 'defaultSets', 'defaultReps', 'exercise_link', 'met']
                   }
                 }
               },
@@ -1350,16 +1467,18 @@ Keep everything minimal and actionable.`;
           }
         });
         const result = JSON.parse(response.candidates[0].content.parts[0].text);
-        showWorkoutSummaryModal(result);
+        const calories = calculateWorkoutCalories(currentWorkout);
+        showWorkoutSummaryModal(result, calories);
       } catch (error) {
         console.error('Error generating summary:', error);
         showToast('Failed to generate workout summary', 'error');
       }
     }
 
-    function showWorkoutSummaryModal(result) {
+    function showWorkoutSummaryModal(result, calories) {
       document.getElementById('summaryContent').innerHTML = `
         <p><strong>Rating:</strong> ${result.rating}</p>
+        <p><strong>Calories Burned:</strong> ${calories} cal</p>
         <p><strong>Key Metrics:</strong> ${result.keyMetrics}</p>
         <p><strong>Comparison:</strong> ${result.comparison}</p>
         <p><strong>Tips:</strong> ${result.tips}</p>
@@ -1387,11 +1506,20 @@ Keep everything minimal and actionable.`;
           const key = document.getElementById('apiKeyInput').value.trim();
           const breakDurationValue = parseInt(document.getElementById('breakDurationSelect').value);
           const autoRestEnabled = document.getElementById('autoRestTimerToggle').checked;
+          const weightValue = parseFloat(document.getElementById('weightInput').value) || 70;
+          const heightValue = parseFloat(document.getElementById('heightInput').value) || 5.8;
           saveApiKey(key);
           saveBreakDuration(breakDurationValue);
           saveAutoRest(autoRestEnabled);
+          saveUserWeight(weightValue);
+          saveUserHeight(heightValue);
           breakDuration = breakDurationValue;
           document.getElementById('apiKeyMessage').style.display = 'none';
+
+          // Update BMR display with new values
+          const bmr = calculateBMR();
+          document.getElementById('bmrDisplay').textContent = `BMR: ${bmr} cal/day • Weight: ${weightValue}kg • Height: ${heightValue}ft`;
+
           document.getElementById('userModal').style.display = 'none';
           showToast('Settings saved');
         });
@@ -1645,7 +1773,8 @@ Keep everything minimal and actionable.`;
              console.log('Service Worker registered with scope:', registration.scope);
            })
            .catch((error) => {
-             console.log('Service Worker registration failed:', error);
+             console.log('Service Worker registration failed:', error.message);
+             // Service worker is optional, so we don't show an error to the user
            });
        }
      }

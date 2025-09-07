@@ -4,12 +4,12 @@ const WORKOUT_TEMPLATES = [
     name: "Push Day - Strength Focus",
     muscles: ["Chest", "Shoulders", "Arms"],
     exercises: [
-      { name:"Barbell Bench Press", muscle:"Chest", defaultSets:4, defaultReps:5, exercise_link:"https://musclewiki.com/exercise/barbell-bench-press" },
-      { name:"Overhead Press", muscle:"Shoulders", defaultSets:3, defaultReps:6, exercise_link:"" },
-      { name:"Incline Dumbbell Press", muscle:"Chest", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/dumbbell-incline-bench-press" },
-      { name:"Dumbbell Lateral Raise", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise" },
-      { name:"Close Grip Bench Press", muscle:"Arms", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-close-grip-bench-press" },
-      { name:"Overhead Triceps Extension", muscle:"Arms", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-overhead-tricep-extension" }
+      { name:"Barbell Bench Press", muscle:"Chest", defaultSets:4, defaultReps:5, exercise_link:"https://musclewiki.com/exercise/barbell-bench-press", met:6 },
+      { name:"Overhead Press", muscle:"Shoulders", defaultSets:3, defaultReps:6, exercise_link:"", met:5 },
+      { name:"Incline Dumbbell Press", muscle:"Chest", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/dumbbell-incline-bench-press", met:6 },
+      { name:"Dumbbell Lateral Raise", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise", met:4 },
+      { name:"Close Grip Bench Press", muscle:"Arms", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-close-grip-bench-press", met:6 },
+      { name:"Overhead Triceps Extension", muscle:"Arms", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-overhead-tricep-extension", met:4 }
     ]
   },
   {
@@ -17,13 +17,13 @@ const WORKOUT_TEMPLATES = [
     name: "Push Day - Hypertrophy Focus",
     muscles: ["Chest", "Shoulders", "Arms"],
     exercises: [
-      { name:"Flat Dumbbell Press", muscle:"Chest", defaultSets:4, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-bench-press" },
-      { name:"Incline Bench Press", muscle:"Chest", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/incline-bench-press" },
-      { name:"Seated Dumbbell Shoulder Press", muscle:"Shoulders", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-seated-shoulder-press" },
-      { name:"Side Lateral Raises", muscle:"Shoulders", defaultSets:4, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise" },
-      { name:"Dips", muscle:"Arms", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/parallel-bar-dips" },
-      { name:"Triceps Pushdowns", muscle:"Arms", defaultSets:3, defaultReps:15, exercise_link:"https://musclewiki.com/exercise/cable-tricep-pushdown" },
-      { name:"Front Raises", muscle:"Shoulders", defaultSets:2, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-front-raise" }
+      { name:"Flat Dumbbell Press", muscle:"Chest", defaultSets:4, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-bench-press", met:6 },
+      { name:"Incline Bench Press", muscle:"Chest", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/incline-bench-press", met:6 },
+      { name:"Seated Dumbbell Shoulder Press", muscle:"Shoulders", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-seated-shoulder-press", met:5 },
+      { name:"Side Lateral Raises", muscle:"Shoulders", defaultSets:4, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise", met:4 },
+      { name:"Dips", muscle:"Arms", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/parallel-bar-dips", met:7 },
+      { name:"Triceps Pushdowns", muscle:"Arms", defaultSets:3, defaultReps:15, exercise_link:"https://musclewiki.com/exercise/cable-tricep-pushdown", met:4 },
+      { name:"Front Raises", muscle:"Shoulders", defaultSets:2, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-front-raise", met:4 }
     ]
   },
   {
@@ -44,12 +44,12 @@ const WORKOUT_TEMPLATES = [
     name: "Pull Day - Strength Focus",
     muscles: ["Back", "Arms", "Shoulders"],
     exercises: [
-      { name:"Deadlift", muscle:"Back", defaultSets:4, defaultReps:5, exercise_link:"https://musclewiki.com/exercise/barbell-deadlift" },
-      { name:"Weighted Pull-ups", muscle:"Back", defaultSets:4, defaultReps:6, exercise_link:"https://musclewiki.com/exercise/weighted-pull-up" },
-      { name:"Barbell Rows", muscle:"Back", defaultSets:3, defaultReps:6, exercise_link:"https://musclewiki.com/exercise/barbell-bent-over-row" },
-      { name:"Chest Supported Row", muscle:"Back", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/dumbbell-chest-supported-row" },
-      { name:"Barbell Curl", muscle:"Arms", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-curl" },
-      { name:"Face Pulls", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/cable-face-pull" }
+      { name:"Deadlift", muscle:"Back", defaultSets:4, defaultReps:5, exercise_link:"https://musclewiki.com/exercise/barbell-deadlift", met:6 },
+      { name:"Weighted Pull-ups", muscle:"Back", defaultSets:4, defaultReps:6, exercise_link:"https://musclewiki.com/exercise/weighted-pull-up", met:8 },
+      { name:"Barbell Rows", muscle:"Back", defaultSets:3, defaultReps:6, exercise_link:"https://musclewiki.com/exercise/barbell-bent-over-row", met:5 },
+      { name:"Chest Supported Row", muscle:"Back", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/dumbbell-chest-supported-row", met:5 },
+      { name:"Barbell Curl", muscle:"Arms", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-curl", met:4 },
+      { name:"Face Pulls", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/cable-face-pull", met:4 }
     ]
   },
   {
@@ -336,34 +336,34 @@ const WORKOUT_TEMPLATES = [
 
 // Comprehensive exercise database with all possible exercises
 const COMPREHENSIVE_EXERCISES = [
- // Chest Exercises
- { name: "Barbell Bench Press", muscle: "Chest", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-bench-press" },
- { name: "Dumbbell Bench Press", muscle: "Chest", defaultSets: 4, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-bench-press" },
- { name: "Incline Bench Press", muscle: "Chest", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/incline-bench-press" },
- { name: "Incline Dumbbell Press", muscle: "Chest", defaultSets: 4, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-incline-bench-press" },
- { name: "Decline Bench Press", muscle: "Chest", defaultSets: 3, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/decline-bench-press" },
- { name: "Chest Flyes", muscle: "Chest", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-fly" },
- { name: "Cable Flyes", muscle: "Chest", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/cable-fly" },
- { name: "Pec Deck Machine", muscle: "Chest", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/machine-fly" },
- { name: "Push-ups", muscle: "Chest", defaultSets: 3, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/push-up" },
- { name: "Diamond Push-ups", muscle: "Chest", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/diamond-push-up" },
- { name: "Dips", muscle: "Chest", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/parallel-bar-dips" },
- { name: "Weighted Dips", muscle: "Chest", defaultSets: 3, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/weighted-dip" },
+  // Chest Exercises
+  { name: "Barbell Bench Press", muscle: "Chest", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-bench-press", met: 6 },
+  { name: "Dumbbell Bench Press", muscle: "Chest", defaultSets: 4, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-bench-press", met: 6 },
+  { name: "Incline Bench Press", muscle: "Chest", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/incline-bench-press", met: 6 },
+  { name: "Incline Dumbbell Press", muscle: "Chest", defaultSets: 4, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-incline-bench-press", met: 6 },
+  { name: "Decline Bench Press", muscle: "Chest", defaultSets: 3, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/decline-bench-press", met: 6 },
+  { name: "Chest Flyes", muscle: "Chest", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-fly", met: 4 },
+  { name: "Cable Flyes", muscle: "Chest", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/cable-fly", met: 4 },
+  { name: "Pec Deck Machine", muscle: "Chest", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/machine-fly", met: 4 },
+  { name: "Push-ups", muscle: "Chest", defaultSets: 3, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/push-up", met: 7 },
+  { name: "Diamond Push-ups", muscle: "Chest", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/diamond-push-up", met: 8 },
+  { name: "Dips", muscle: "Chest", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/parallel-bar-dips", met: 7 },
+  { name: "Weighted Dips", muscle: "Chest", defaultSets: 3, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/weighted-dip", met: 7 },
 
  // Back Exercises
- { name: "Deadlift", muscle: "Back", defaultSets: 4, defaultReps: 6, exercise_link: "https://musclewiki.com/exercise/barbell-deadlift" },
- { name: "Romanian Deadlift", muscle: "Back", defaultSets: 3, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-romanian-deadlift" },
- { name: "Pull-ups", muscle: "Back", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/pull-up" },
- { name: "Chin-ups", muscle: "Back", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/chin-up" },
- { name: "Weighted Pull-ups", muscle: "Back", defaultSets: 4, defaultReps: 6, exercise_link: "https://musclewiki.com/exercise/weighted-pull-up" },
- { name: "Lat Pulldown", muscle: "Back", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/cable-lat-pulldown" },
- { name: "Seated Cable Row", muscle: "Back", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/cable-seated-row" },
- { name: "Bent-Over Row", muscle: "Back", defaultSets: 3, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-bent-over-row" },
- { name: "T-Bar Row", muscle: "Back", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/barbell-t-bar-row" },
- { name: "Single Arm Dumbbell Row", muscle: "Back", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-row" },
- { name: "Face Pulls", muscle: "Back", defaultSets: 3, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/cable-face-pull" },
- { name: "Straight Arm Pulldown", muscle: "Back", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/cable-straight-arm-pulldown" },
- { name: "Shrugs", muscle: "Back", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-shrug" },
+ { name: "Deadlift", muscle: "Back", defaultSets: 4, defaultReps: 6, exercise_link: "https://musclewiki.com/exercise/barbell-deadlift", met: 6 },
+ { name: "Romanian Deadlift", muscle: "Back", defaultSets: 3, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-romanian-deadlift", met: 5 },
+ { name: "Pull-ups", muscle: "Back", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/pull-up", met: 8 },
+ { name: "Chin-ups", muscle: "Back", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/chin-up", met: 8 },
+ { name: "Weighted Pull-ups", muscle: "Back", defaultSets: 4, defaultReps: 6, exercise_link: "https://musclewiki.com/exercise/weighted-pull-up", met: 8 },
+ { name: "Lat Pulldown", muscle: "Back", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/cable-lat-pulldown", met: 5 },
+ { name: "Seated Cable Row", muscle: "Back", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/cable-seated-row", met: 5 },
+ { name: "Bent-Over Row", muscle: "Back", defaultSets: 3, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-bent-over-row", met: 5 },
+ { name: "T-Bar Row", muscle: "Back", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/barbell-t-bar-row", met: 5 },
+ { name: "Single Arm Dumbbell Row", muscle: "Back", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-row", met: 5 },
+ { name: "Face Pulls", muscle: "Back", defaultSets: 3, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/cable-face-pull", met: 4 },
+ { name: "Straight Arm Pulldown", muscle: "Back", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/cable-straight-arm-pulldown", met: 4 },
+ { name: "Shrugs", muscle: "Back", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-shrug", met: 4 },
 
  // Shoulder Exercises
  { name: "Overhead Press", muscle: "Shoulders", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/standing-barbell-press" },
@@ -389,18 +389,18 @@ const COMPREHENSIVE_EXERCISES = [
  { name: "Skull Crushers", muscle: "Arms", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/ez-bar-skull-crusher" },
 
  // Leg Exercises
- { name: "Back Squat", muscle: "Legs", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-squat" },
- { name: "Front Squat", muscle: "Legs", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-front-squat" },
- { name: "Goblet Squat", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-goblet-squat" },
- { name: "Bulgarian Split Squat", muscle: "Legs", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-bulgarian-split-squat" },
- { name: "Lunges", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-lunge" },
- { name: "Walking Lunges", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-walking-lunge" },
- { name: "Step-ups", muscle: "Legs", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-step-up" },
- { name: "Leg Press", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/machine-leg-press" },
- { name: "Leg Extension", muscle: "Legs", defaultSets: 3, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/machine-leg-extension" },
- { name: "Leg Curl", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/machine-seated-leg-curl" },
- { name: "Calf Raises", muscle: "Legs", defaultSets: 4, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/machine-standing-calf-raise" },
- { name: "Seated Calf Raises", muscle: "Legs", defaultSets: 4, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/machine-seated-calf-raise" },
+ { name: "Back Squat", muscle: "Legs", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-squat", met: 5 },
+ { name: "Front Squat", muscle: "Legs", defaultSets: 4, defaultReps: 8, exercise_link: "https://musclewiki.com/exercise/barbell-front-squat", met: 5 },
+ { name: "Goblet Squat", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-goblet-squat", met: 5 },
+ { name: "Bulgarian Split Squat", muscle: "Legs", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-bulgarian-split-squat", met: 5 },
+ { name: "Lunges", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-lunge", met: 5 },
+ { name: "Walking Lunges", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/dumbbell-walking-lunge", met: 5 },
+ { name: "Step-ups", muscle: "Legs", defaultSets: 3, defaultReps: 10, exercise_link: "https://musclewiki.com/exercise/dumbbell-step-up", met: 6 },
+ { name: "Leg Press", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/machine-leg-press", met: 4 },
+ { name: "Leg Extension", muscle: "Legs", defaultSets: 3, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/machine-leg-extension", met: 4 },
+ { name: "Leg Curl", muscle: "Legs", defaultSets: 3, defaultReps: 12, exercise_link: "https://musclewiki.com/exercise/machine-seated-leg-curl", met: 4 },
+ { name: "Calf Raises", muscle: "Legs", defaultSets: 4, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/machine-standing-calf-raise", met: 4 },
+ { name: "Seated Calf Raises", muscle: "Legs", defaultSets: 4, defaultReps: 15, exercise_link: "https://musclewiki.com/exercise/machine-seated-calf-raise", met: 4 },
 
  // Core Exercises
  { name: "Plank", muscle: "Core", defaultSets: 3, defaultReps: 60, exercise_link: "https://musclewiki.com/exercise/plank", trackingType: "time_distance" },

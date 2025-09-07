@@ -828,24 +828,44 @@
     }
     .modal-content{
       background: var(--card);
-      padding: 20px;
+      padding: 16px;
       border-radius: var(--radius);
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      min-width: 250px;
-      width: 100%;
-      height: 100%;
+      gap: 12px;
+      min-width: 280px;
+      max-width: 90vw;
+      width: auto;
+      max-height: 90vh;
+      height: auto;
       overflow: hidden;
       transform: scale(0.95);
       opacity: 0;
       animation: modalIn 200ms ease-out forwards;
+      box-shadow: var(--shadow);
     }
     .modal-content h3{
       margin: 0;
       font-size: 18px;
       font-weight: 700;
       overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .modal-content > *:not(h3):not(.modal-footer) {
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .modal-footer {
+      flex-shrink: 0;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
     }
 
     /* Floating Resume */
@@ -1103,6 +1123,18 @@
         max-width: 95vw;
         width: 95vw;
         padding: 16px;
+      }
+
+      /* General modal mobile styles */
+      .modal {
+        padding: 16px;
+      }
+
+      .modal-content {
+        max-width: 95vw;
+        max-height: 95vh;
+        padding: 12px;
+        gap: 8px;
       }
 
       #exerciseSelectorModal .filter-chips {
