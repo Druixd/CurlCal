@@ -106,10 +106,10 @@
     // Save user data to Firestore
     function saveUserData() {
       if (!currentUser) return;
-      const data = {
+      const data = cleanObject({
         history: history || [],
         activeWorkout: activeWorkout || null
-      };
+      });
       db.collection('users').doc(currentUser.uid).set(data, { merge: true })
         .catch((error) => {
           console.error('Error saving user data to Firestore:', error);
@@ -311,6 +311,25 @@
       const bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
       return Math.round(bmr);
     }
+    function cleanObject(obj) {
+      if (obj === null || typeof obj !== 'object') return obj;
+      if (Array.isArray(obj)) {
+        return obj.map(cleanObject);
+      }
+      const cleaned = {};
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const value = obj[key];
+          if (value === undefined) {
+            cleaned[key] = null;
+          } else {
+            cleaned[key] = cleanObject(value);
+          }
+        }
+      }
+      return cleaned;
+    }
+
     function getExercisePref(exerciseName){
       const prefs = loadExercisePrefs();
       return prefs[exerciseName] || {};
