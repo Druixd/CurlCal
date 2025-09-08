@@ -1010,6 +1010,11 @@
       const activeMuscle = document.querySelector("#exerciseChips .chip.active")?.dataset.muscle || "All";
       const q = document.getElementById("exerciseSearchInput").value.trim().toLowerCase();
 
+      if(replaceMode.active){
+        renderReplaceExerciseSelector(activeWorkout.exercises[replaceMode.ei].muscle, activeWorkout.exercises[replaceMode.ei].name);
+        return;
+      }
+
       let items = ALL_EXERCISES
         .filter(ex => {
           if(activeMuscle === "All") return true;
@@ -1047,39 +1052,134 @@
         `;
         grid.appendChild(el);
       }
+
+      // Reset modal title for add mode
+      document.querySelector('#exerciseSelectorModal h3').textContent = 'Add Exercises to Workout';
+      document.getElementById('addSelectedExercisesBtn').textContent = 'Add Selected';
+      document.querySelector('#exerciseSelectorModal .filters').style.display = 'block';
+    }
+
+    let replaceMode = { ei: null, active: false };
+
+    function openReplaceExerciseSelector(ei){
+      if(!activeWorkout) return;
+      const currentEx = activeWorkout.exercises[ei];
+      replaceMode = { ei, active: true };
+      selectedExercises.clear();
+      // Hide filters for replace mode
+      document.querySelector('#exerciseSelectorModal .filters').style.display = 'none';
+      renderReplaceExerciseSelector(currentEx.muscle, currentEx.name);
+      document.getElementById('exerciseSelectorModal').style.display = 'flex';
+    }
+
+    function renderReplaceExerciseSelector(muscle, excludeName){
+      const grid = document.getElementById("exerciseSelectorGrid");
+      const activeMuscle = muscle; // Fixed to current muscle
+      const q = document.getElementById("exerciseSearchInput").value.trim().toLowerCase();
+
+      let items = ALL_EXERCISES
+        .filter(ex => ex.muscle === activeMuscle && ex.name !== excludeName)
+        .filter(ex => ex.name.toLowerCase().includes(q));
+
+      grid.innerHTML = "";
+      if(items.length === 0){
+        grid.innerHTML = `
+          <div class="card" style="grid-column: 1 / -1; text-align:center">
+            <div class="muted">No similar exercises found.</div>
+          </div>
+        `;
+        return;
+      }
+
+      for(const ex of items){
+        const isSelected = selectedExercises.has(ex.name);
+        const el = document.createElement("div");
+        el.className = `card ${isSelected ? 'selected' : ''}`;
+        el.dataset.exercise = ex.name;
+        el.innerHTML = `
+          <div class="title-row">
+            <h3>${ex.name}</h3>
+          </div>
+          <div class="badges">
+            <span class="badge">${ex.muscle}</span>
+          </div>
+        `;
+        grid.appendChild(el);
+      }
+
+      // Update modal title
+      document.querySelector('#exerciseSelectorModal h3').textContent = 'Replace with Similar Exercise';
+      document.getElementById('addSelectedExercisesBtn').textContent = 'Replace Exercise';
     }
 
     function addSelectedExercises(){
       if(!activeWorkout || selectedExercises.size === 0) return;
 
-      const exercisesToAdd = Array.from(selectedExercises).map(name => {
-        const ex = ALL_EXERCISES.find(e => e.name === name);
-        const pref = getExercisePref(ex.name);
-        const isTimeDistance = ex.trackingType === "time_distance";
-        return {
-          name: ex.name,
-          muscle: ex.muscle,
-          exercise_link: ex.exercise_link,
-          trackingType: ex.trackingType || "weight_reps",
-          met: ex.met,
-          sets: Array.from({ length: pref.lastSets || ex.defaultSets }, () => {
-            if(ex.name === 'Plank'){
-              return { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
+      if(replaceMode.active){
+        // Replace mode
+        const ei = replaceMode.ei;
+        const selectedName = Array.from(selectedExercises)[0]; // Only one for replacement
+        const newEx = ALL_EXERCISES.find(e => e.name === selectedName);
+        const pref = getExercisePref(newEx.name);
+        const isTimeDistance = newEx.trackingType === "time_distance";
+        const currentSets = activeWorkout.exercises[ei].sets.length;
+
+        const replacedExercise = {
+          name: newEx.name,
+          muscle: newEx.muscle,
+          exercise_link: newEx.exercise_link,
+          trackingType: newEx.trackingType || "weight_reps",
+          met: newEx.met,
+          sets: Array.from({ length: currentSets }, (_, i) => {
+            const existingSet = activeWorkout.exercises[ei].sets[i];
+            if(newEx.name === 'Plank'){
+              return { weight: existingSet?.weight || pref.lastWeight || 0, time: existingSet?.time || pref.lastTime || 0, completed: existingSet?.completed || false };
             } else if(isTimeDistance){
-              return { time: pref.lastTime || 0, distance: pref.lastDistance || 0, completed: false };
+              return { time: existingSet?.time || pref.lastTime || 0, distance: existingSet?.distance || pref.lastDistance || 0, completed: existingSet?.completed || false };
             } else {
-              return { weight: pref.lastWeight || 0, reps: pref.lastReps || ex.defaultReps, completed: false };
+              return { weight: existingSet?.weight || pref.lastWeight || 0, reps: existingSet?.reps || pref.lastReps || newEx.defaultReps, completed: existingSet?.completed || false };
             }
           })
         };
-      });
 
-      activeWorkout.exercises.push(...exercisesToAdd);
-      saveActiveWorkout();
-      renderWorkout();
-      document.getElementById('exerciseSelectorModal').style.display = 'none';
-      selectedExercises.clear();
-      showToast(`Added ${exercisesToAdd.length} exercise${exercisesToAdd.length > 1 ? 's' : ''} to workout`);
+        activeWorkout.exercises[ei] = replacedExercise;
+        saveActiveWorkout();
+        renderWorkout();
+        document.getElementById('exerciseSelectorModal').style.display = 'none';
+        selectedExercises.clear();
+        replaceMode = { ei: null, active: false };
+        showToast('Exercise replaced');
+      } else {
+        // Add mode
+        const exercisesToAdd = Array.from(selectedExercises).map(name => {
+          const ex = ALL_EXERCISES.find(e => e.name === name);
+          const pref = getExercisePref(ex.name);
+          const isTimeDistance = ex.trackingType === "time_distance";
+          return {
+            name: ex.name,
+            muscle: ex.muscle,
+            exercise_link: ex.exercise_link,
+            trackingType: ex.trackingType || "weight_reps",
+            met: ex.met,
+            sets: Array.from({ length: pref.lastSets || ex.defaultSets }, () => {
+              if(ex.name === 'Plank'){
+                return { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
+              } else if(isTimeDistance){
+                return { time: pref.lastTime || 0, distance: pref.lastDistance || 0, completed: false };
+              } else {
+                return { weight: pref.lastWeight || 0, reps: pref.lastReps || ex.defaultReps, completed: false };
+              }
+            })
+          };
+        });
+
+        activeWorkout.exercises.push(...exercisesToAdd);
+        saveActiveWorkout();
+        renderWorkout();
+        document.getElementById('exerciseSelectorModal').style.display = 'none';
+        selectedExercises.clear();
+        showToast(`Added ${exercisesToAdd.length} exercise${exercisesToAdd.length > 1 ? 's' : ''} to workout`);
+      }
     }
 
     // ===== Calendar =====
@@ -1664,18 +1764,27 @@ Keep everything minimal and actionable.`;
         const card = e.target.closest(".card");
         if(!card) return;
         const exerciseName = card.dataset.exercise;
-        if(selectedExercises.has(exerciseName)){
-          selectedExercises.delete(exerciseName);
-          card.classList.remove("selected");
-        } else {
+        if(replaceMode.active){
+          // Single selection for replace
+          selectedExercises.clear();
+          document.querySelectorAll('#exerciseSelectorGrid .card').forEach(c => c.classList.remove('selected'));
           selectedExercises.add(exerciseName);
           card.classList.add("selected");
+        } else {
+          if(selectedExercises.has(exerciseName)){
+            selectedExercises.delete(exerciseName);
+            card.classList.remove("selected");
+          } else {
+            selectedExercises.add(exerciseName);
+            card.classList.add("selected");
+          }
         }
       });
       document.getElementById('addSelectedExercisesBtn').addEventListener('click', addSelectedExercises);
       document.getElementById('cancelExerciseSelectorBtn').addEventListener('click', () => {
         document.getElementById('exerciseSelectorModal').style.display = 'none';
         selectedExercises.clear();
+        replaceMode = { ei: null, active: false };
       });
 
       // Custom exercise in selector
@@ -1744,6 +1853,13 @@ Keep everything minimal and actionable.`;
           saveActiveWorkout();
           renderWorkout();
           showToast('Exercise removed from workout');
+        }
+        document.getElementById('exerciseOptionsModal').style.display = 'none';
+      });
+
+      document.getElementById('replaceExerciseBtn').addEventListener('click', () => {
+        if (selectedExerciseIndex !== null && activeWorkout) {
+          openReplaceExerciseSelector(selectedExerciseIndex);
         }
         document.getElementById('exerciseOptionsModal').style.display = 'none';
       });
