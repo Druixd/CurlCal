@@ -226,6 +226,31 @@
       return count;
     }
 
+// Inline calculation evaluator: supports digits, spaces, + - * / . and parentheses.
+// Returns a finite number (rounded to 3 decimals) or null if not evaluable/safe.
+function evaluateInlineCalc(raw){
+  if (raw == null) return null;
+  const str = String(raw).trim()
+    .replace(/×/g, '*')
+    .replace(/÷/g, '/');
+
+  // Allow only safe characters
+  if (!/^[\d+\-*/().\s]+$/.test(str)) return null;
+  // Must contain at least one digit
+  if (!/\d/.test(str)) return null;
+
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function('"use strict";return (' + str + ')')();
+    if (typeof result === 'number' && isFinite(result)) {
+      // Round to 3 decimals to avoid floating point noise
+      return Math.round(result * 1000) / 1000;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
     // API Key utilities
     function loadApiKey(){
       return localStorage.getItem(LS_API_KEY) || "";
@@ -675,14 +700,14 @@
                 <div class="set" data-ex="${ei}" data-set="${si}">
                   <div class="index set-index-btn" data-ei="${ei}" data-si="${si}">${si+1}</div>
                   ${ex.name === 'Plank' ? `
-                    <input type="number" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
-                    <input type="number" inputmode="numeric" step="1" placeholder="Time (sec)" value="${s.time ?? ''}" data-time />
+                    <input type="text" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
+                    <input type="text" inputmode="numeric" step="1" placeholder="Time (sec)" value="${s.time ?? ''}" data-time />
                   ` : isTimeDistance ? `
-                    <input type="number" inputmode="decimal" step="0.1" placeholder="Time (min)" value="${s.time ?? ''}" data-time />
-                    <input type="number" inputmode="decimal" step="0.1" placeholder="Distance (km)" value="${s.distance ?? ''}" data-distance />
+                    <input type="text" inputmode="decimal" step="0.1" placeholder="Time (min)" value="${s.time ?? ''}" data-time />
+                    <input type="text" inputmode="decimal" step="0.1" placeholder="Distance (km)" value="${s.distance ?? ''}" data-distance />
                   ` : `
-                    <input type="number" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
-                    <input type="number" inputmode="numeric" step="1" placeholder="Reps" value="${s.reps ?? ''}" data-reps />
+                    <input type="text" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
+                    <input type="text" inputmode="numeric" step="1" placeholder="Reps" value="${s.reps ?? ''}" data-reps />
                   `}
                   <div class="complete ${s.completed?'checked':''}" data-complete title="Mark set complete">
                     ${s.completed ? '&#10003;' : ''}
@@ -772,13 +797,42 @@
       const ei = Number(setEl.getAttribute("data-ex"));
       const si = Number(setEl.getAttribute("data-set"));
       if(!activeWorkout) return;
-
+    
+      const raw = String(target.value ?? '');
+      const trimmed = raw.trim();
+    
+      // If the input ends with an operator or a trailing decimal point,
+      // don't evaluate yet to allow typing decimals like "22.5" or "10+"
+      const trailingOperator = /[+\-*/.]$/.test(trimmed);
+      const evaluated = trailingOperator ? null : evaluateInlineCalc(raw);
+    
+      // Decide value to persist
+      let val;
+      if (evaluated !== null) {
+        val = evaluated;
+      } else {
+        // Try parsing current raw text without forcing UI replacement
+        const parsed = parseFloat(raw);
+        val = Number.isFinite(parsed) ? parsed : (raw === '' ? 0 : 0);
+      }
+    
+      // Reps should be an integer
+      if (target.hasAttribute("data-reps")) {
+        val = Math.round(val);
+      }
+    
+      // Only replace the field when we got a clean evaluation and it's not an incomplete expression
+      if (evaluated !== null) {
+        target.value = String(val);
+      }
+    
       const ex = activeWorkout.exercises[ei];
       const s  = ex.sets[si];
-      if(target.hasAttribute("data-weight")) s.weight = Number(target.value || 0);
-      if(target.hasAttribute("data-reps"))   s.reps   = Number(target.value || 0);
-      if(target.hasAttribute("data-time"))   s.time   = Number(target.value || 0);
-      if(target.hasAttribute("data-distance")) s.distance = Number(target.value || 0);
+      if(target.hasAttribute("data-weight"))   s.weight   = val;
+      if(target.hasAttribute("data-reps"))     s.reps     = val;
+      if(target.hasAttribute("data-time"))     s.time     = val;
+      if(target.hasAttribute("data-distance")) s.distance = val;
+    
       saveActiveWorkout();
       updateWorkoutProgressBar();
     }
