@@ -1001,6 +1001,19 @@
       from { opacity: 0; transform: scale(0.95); }
       to   { opacity: 1; transform: scale(1); }
     }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--border);
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
 
     /* Focus ring */
     .btn:focus-visible, .icon-btn:focus-visible, .chip:focus-visible, .day:focus-visible{
@@ -1035,24 +1048,30 @@
       .container {
         padding: 0 40px;
       }
-      
+
       header.app-header {
         padding: 24px 0 32px;
       }
-      
+
       .tabs {
         max-width: 400px;
         margin: 0 auto var(--gap-lg);
       }
-      
+
       .calendar-grid {
         --cell: 52px;
         gap: 10px;
       }
-      
+
       .set {
         padding: 16px;
         gap: 16px;
+      }
+
+      /* Reduce AI workout generator modal width on desktop */
+      #generateModal .modal-content {
+        max-width: 500px;
+        width: 500px;
       }
     }
     

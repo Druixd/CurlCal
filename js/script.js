@@ -510,9 +510,7 @@
         <div class="modal-content" role="dialog" aria-labelledby="templatePreviewTitle" style="max-width:640px">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
             <h3 id="templatePreviewTitle" style="margin:0">${t.name}</h3>
-            <button id="closeTemplatePreview" class="btn secondary" aria-label="Close preview">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            </button>
+          
           </div>
           <div style="margin-top:8px; color:var(--muted)">Muscles: ${t.muscles.join(', ')} • Est. ${estimatedCalories} cal</div>
           <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow:auto; padding-right:8px">
@@ -1454,13 +1452,22 @@
       }
       const apiKey = loadApiKey();
       if (!apiKey) {
+        document.getElementById('generateModal').style.display = 'none';
         document.getElementById('userModal').style.display = 'flex';
         return;
       }
       // Show loading
       document.getElementById('generateBtn').disabled = true;
       document.getElementById('generateBtn').textContent = 'Generating...';
+
+      // Hide input and suggestions, show loading
+      document.getElementById('workoutDescription').style.display = 'none';
+      document.getElementById('promptSuggestions').style.display = 'none';
+      document.getElementById('loadingContainer').style.display = 'block';
+      document.getElementById('statusText').textContent = 'Preparing request...';
+
       try {
+        document.getElementById('statusText').textContent = 'Connecting to API...';
         const ai = new GoogleGenAI({ apiKey });
         // Parse exercise count from description
         const countMatch = description.match(/(\d+)\s*(?:exercises?|exs?)/i);
@@ -1488,8 +1495,11 @@ Output in JSON format with the following structure:
 }
 
 Make sure the exercises are real and have valid musclewiki links. Include appropriate MET (Metabolic Equivalent of Task) values for calorie estimation. ${countInstruction}`;
+
+        document.getElementById('statusText').textContent = 'Sending request to AI...';
+
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-1.5-flash',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
@@ -1519,10 +1529,21 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
             }
           }
         });
+
+        document.getElementById('statusText').textContent = 'AI is generating workout...';
+
         const workout = JSON.parse(response.candidates[0].content.parts[0].text);
+
+        document.getElementById('statusText').textContent = 'Parsing workout data...';
+
         workout.isCustom = true;
+
+        document.getElementById('statusText').textContent = 'Saving workout to library...';
+
         // Add to templates
         WORKOUT_TEMPLATES.push(workout);
+
+        document.getElementById('statusText').textContent = 'Finalizing...';
         // Close modal
         document.getElementById('generateModal').style.display = 'none';
         document.getElementById('workoutDescription').value = '';
@@ -1531,8 +1552,17 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
         showToast('Custom workout generated!');
       } catch (error) {
         console.error('Error generating workout:', error);
+        document.getElementById('statusText').textContent = 'Error: ' + (error.message || 'Unknown error');
         showToast('Failed to generate workout', 'error');
+        // Hide loading on error
+        document.getElementById('loadingContainer').style.display = 'none';
+        document.getElementById('workoutDescription').style.display = 'block';
+        document.getElementById('promptSuggestions').style.display = 'flex';
       } finally {
+        // Hide loading, show back inputs
+        document.getElementById('loadingContainer').style.display = 'none';
+        document.getElementById('workoutDescription').style.display = 'block';
+        document.getElementById('promptSuggestions').style.display = 'flex';
         document.getElementById('generateBtn').disabled = false;
         document.getElementById('generateBtn').textContent = 'Generate';
       }
@@ -1569,7 +1599,7 @@ Keep everything minimal and actionable.`;
       try {
         const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-1.5-flash',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
