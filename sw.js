@@ -1,4 +1,4 @@
-const CACHE_NAME = 'curlcal-v1.3.9';
+const CACHE_NAME = 'curlcal-v1.3.14';
 const urlsToCache = [
   '/',
   '/index.html',

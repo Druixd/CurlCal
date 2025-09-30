@@ -1000,7 +1000,7 @@ function evaluateInlineCalc(raw){
       saveHistory();
 
       // Generate AI summary
-      generateWorkoutSummary(record);
+      generateWorkoutSummary(record.id);
 
       // Update exercise preferences
       activeWorkout.exercises.forEach(ex => {
@@ -1100,7 +1100,6 @@ function evaluateInlineCalc(raw){
           <div class="badges">
             ${ex.muscles.map(m => `<span class="badge">${m}</span>`).join("")}
           </div>
-          <div class="muted">${ex.muscle}</div>
         `;
         grid.appendChild(el);
       }
@@ -1153,7 +1152,7 @@ function evaluateInlineCalc(raw){
             <h3>${ex.name}</h3>
           </div>
           <div class="badges">
-            <span class="badge">${ex.muscle}</span>
+            ${ex.muscles.map(m => `<span class="badge">${m}</span>`).join("")}
           </div>
         `;
         grid.appendChild(el);
@@ -1293,6 +1292,309 @@ function evaluateInlineCalc(raw){
       return div;
     }
 
+    // Populate comprehensive workout detail modal
+    function populateWorkoutDetailModal(record) {
+      const modal = document.getElementById('workoutDetailModal');
+      const titleEl = document.getElementById('workoutDetailTitle');
+
+      // Set workout title in summary section
+      titleEl.textContent = `${record.name} — ${fmtDate(record.dateKey)}`;
+
+      // Populate workout summary section
+      populateWorkoutSummary(record);
+
+      // Populate AI summary section if available
+      populateAISummary(record);
+
+      // Populate exercise breakdown
+      populateExerciseBreakdown(record);
+
+      // Set up modal buttons
+      setupModalButtons(record);
+
+      // Show modal
+      modal.style.display = 'flex';
+    }
+
+    function populateWorkoutSummary(record) {
+      // Calculate workout statistics
+      const totalSets = record.exercises.reduce((a, ex) => a + (ex.sets?.length || 0), 0);
+      const completedSets = record.exercises.reduce((a, ex) => a + (ex.sets?.filter(s => s.completed).length || 0), 0);
+      const startTime = new Date(record.startTime);
+      const endTime = new Date(record.endTime);
+      const durationMinutes = record.minutes || minutesBetween(record.startTime, record.endTime);
+
+      // Format date and time
+      const dateOptions = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      const timeOptions = {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      };
+
+      const formattedDate = startTime.toLocaleDateString(undefined, dateOptions);
+      const startTimeStr = startTime.toLocaleTimeString(undefined, timeOptions);
+      const endTimeStr = endTime.toLocaleTimeString(undefined, timeOptions);
+
+      // Helper function to safely update DOM elements
+      function safeUpdateElement(id, content, fallbackContent = '-') {
+        const element = document.getElementById(id);
+        if (element) {
+          if (typeof content === 'string' && content.includes('<div')) {
+            element.innerHTML = content;
+          } else {
+            element.textContent = content;
+          }
+        } else {
+          console.warn(`Element with ID '${id}' not found. Available to populate workout summary.`);
+        }
+      }
+
+      // Update summary fields with null checks
+      try {
+        safeUpdateElement('workoutDateTime',
+          `<div style="font-size: 14px; margin-bottom: 4px;">${formattedDate}</div><div style="font-size: 12px; color: var(--muted);">${startTimeStr} - ${endTimeStr}</div>`
+        );
+        safeUpdateElement('workoutDuration', `${durationMinutes} min`);
+        safeUpdateElement('workoutExerciseCount', record.exercises.length);
+        safeUpdateElement('workoutCalories', `${record.calories || 0} cal`);
+        safeUpdateElement('workoutTotalSets', totalSets);
+        safeUpdateElement('workoutCompletedSets', `${completedSets}/${totalSets}`);
+      } catch (error) {
+        console.error('Error populating workout summary:', error);
+        // Fallback: try to populate with basic content
+        safeUpdateElement('workoutDateTime', 'Date & Time not available');
+        safeUpdateElement('workoutDuration', 'Duration not available');
+        safeUpdateElement('workoutExerciseCount', record.exercises?.length || 0);
+        safeUpdateElement('workoutCalories', `${record.calories || 0} cal`);
+        safeUpdateElement('workoutTotalSets', totalSets || 0);
+        safeUpdateElement('workoutCompletedSets', `${completedSets}/${totalSets}`);
+      }
+    }
+
+    function populateAISummary(record) {
+      // Helper function to safely update DOM elements
+      function safeUpdateElement(id, property, value) {
+        const element = document.getElementById(id);
+        if (element && element[property] !== undefined) {
+          element[property] = value;
+        } else {
+          console.warn(`Element with ID '${id}' not found or property '${property}' not available for AI summary.`);
+        }
+      }
+
+      function safeSetInnerHTML(id, content) {
+        const element = document.getElementById(id);
+        if (element) {
+          element.innerHTML = content;
+        } else {
+          console.warn(`Element with ID '${id}' not found for AI summary content.`);
+        }
+      }
+
+      try {
+        const aiSection = document.getElementById('aiSummarySection');
+        const aiContent = document.getElementById('aiSummaryContent');
+
+        if (record.summary && (record.summary.rating || record.summary.keyMetrics || record.summary.comparison || record.summary.tips)) {
+          // Show AI section if elements exist
+          if (aiSection) {
+            aiSection.style.display = 'block';
+          }
+
+          let content = '';
+
+          if (record.summary.rating) {
+            content += `<div style="margin-bottom: 8px;"><strong>Rating:</strong> ${record.summary.rating}</div>`;
+          }
+
+          if (record.summary.keyMetrics) {
+            content += `<div style="margin-bottom: 8px;"><strong>Key Metrics:</strong> ${record.summary.keyMetrics}</div>`;
+          }
+
+          if (record.summary.comparison) {
+            content += `<div style="margin-bottom: 8px;"><strong>Comparison:</strong> ${record.summary.comparison}</div>`;
+          }
+
+          if (record.summary.tips) {
+            const tips = Array.isArray(record.summary.tips) ? record.summary.tips : [record.summary.tips];
+            if (tips.length > 0) {
+              content += `<div style="margin-bottom: 8px;"><strong>Tips:</strong></div><ul>`;
+              tips.forEach(tip => {
+                content += `<li>${tip}</li>`;
+              });
+              content += `</ul>`;
+            }
+          }
+
+          // Safely set content
+          if (aiContent) {
+            aiContent.innerHTML = content;
+          }
+        } else {
+          // Hide AI section if elements exist
+          if (aiSection) {
+            aiSection.style.display = 'none';
+          }
+        }
+      } catch (error) {
+        console.error('Error populating AI summary:', error);
+        // Fallback: try to hide the section if it exists
+        try {
+          const aiSection = document.getElementById('aiSummarySection');
+          if (aiSection) {
+            aiSection.style.display = 'none';
+          }
+        } catch (fallbackError) {
+          console.error('Error in AI summary fallback:', fallbackError);
+        }
+      }
+    }
+
+    function populateExerciseBreakdown(record) {
+      const exerciseList = document.getElementById('workoutExerciseList');
+      exerciseList.innerHTML = '';
+
+      record.exercises.forEach(ex => {
+        const exerciseItem = document.createElement('div');
+        exerciseItem.className = 'exercise-item';
+
+        const exerciseHeader = document.createElement('div');
+        exerciseHeader.className = 'exercise-header';
+
+        const exerciseName = document.createElement('div');
+        exerciseName.className = 'exercise-name';
+        exerciseName.textContent = ex.name;
+
+        const exerciseMuscle = document.createElement('div');
+        exerciseMuscle.className = 'exercise-muscle';
+        exerciseMuscle.textContent = ex.muscle;
+
+        exerciseHeader.appendChild(exerciseName);
+        exerciseHeader.appendChild(exerciseMuscle);
+
+        const setsGrid = document.createElement('div');
+        setsGrid.className = 'sets-grid';
+
+        (ex.sets || []).forEach((set, index) => {
+          const setItem = document.createElement('div');
+          setItem.className = 'set-item';
+
+          const setNumber = document.createElement('div');
+          setNumber.className = 'set-number';
+          setNumber.textContent = `Set ${index + 1}`;
+
+          const setData = document.createElement('div');
+          setData.className = 'set-data';
+
+          // Format set data based on exercise type
+          if (ex.name === 'Plank') {
+            const weightStr = set.weight ? `${set.weight}kg` : '';
+            const timeStr = set.time ? `${set.time}s` : '';
+            setData.textContent = [weightStr, timeStr].filter(Boolean).join(' / ') || (set.completed ? 'Completed' : '—');
+          } else if ('time' in set || 'distance' in set) {
+            const timeStr = set.time ? `${set.time}min` : '';
+            const distStr = set.distance ? `${set.distance}km` : '';
+            setData.textContent = [timeStr, distStr].filter(Boolean).join(' / ') || (set.completed ? 'Completed' : '—');
+          } else {
+            setData.textContent = `${set.weight || 0}kg × ${set.reps || 0} reps`;
+          }
+
+          const setCompleted = document.createElement('div');
+          setCompleted.className = 'set-completed';
+          if (set.completed) {
+            setCompleted.textContent = '✓';
+          }
+
+          setItem.appendChild(setNumber);
+          setItem.appendChild(setData);
+          setItem.appendChild(setCompleted);
+          setsGrid.appendChild(setItem);
+        });
+
+        exerciseItem.appendChild(exerciseHeader);
+        exerciseItem.appendChild(setsGrid);
+        exerciseList.appendChild(exerciseItem);
+      });
+    }
+
+    function setupModalButtons(record) {
+      // Remove existing footer buttons
+      const existingFooter = document.querySelector('#workoutDetailModal .modal-footer');
+      if (existingFooter) {
+        existingFooter.remove();
+      }
+
+      // Create new footer
+      const footer = document.createElement('div');
+      footer.className = 'modal-footer';
+
+      // Share button
+      const shareBtn = document.createElement('button');
+      shareBtn.className = 'btn';
+      shareBtn.id = 'shareWorkoutBtn';
+      shareBtn.textContent = 'Share';
+      shareBtn.addEventListener('click', () => shareWorkout(record));
+
+      // Close button
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'btn secondary';
+      closeBtn.textContent = 'Close';
+      closeBtn.addEventListener('click', () => {
+        document.getElementById('workoutDetailModal').style.display = 'none';
+      });
+
+      // Close button in header
+      const closeHeaderBtn = document.getElementById('closeWorkoutDetailBtn');
+      if (closeHeaderBtn) {
+        closeHeaderBtn.addEventListener('click', () => {
+          document.getElementById('workoutDetailModal').style.display = 'none';
+        });
+      }
+
+      footer.appendChild(shareBtn);
+      footer.appendChild(closeBtn);
+
+      // Add footer to modal
+      const modalContent = document.querySelector('#workoutDetailModal .modal-content');
+      modalContent.appendChild(footer);
+    }
+
+    function shareWorkout(record) {
+      // Build a concise share text
+      const parts = [];
+      parts.push(`${record.name} • ${record.minutes} min • ${record.calories || 0} cal`);
+
+      record.exercises.forEach(ex => {
+        const sets = (ex.sets || []).map(s => {
+          if (ex.name === 'Plank') {
+            return `${s.weight || 0}kg/${s.time || 0}s`;
+          } else if ('time' in s || 'distance' in s) {
+            return `${s.time || 0}min/${s.distance || 0}km`;
+          }
+          return `${s.weight || 0}kg×${s.reps || 0}`;
+        }).join(', ');
+        parts.push(`${ex.name}: ${sets}`);
+      });
+
+      const text = parts.join('\n');
+
+      if (navigator.share) {
+        navigator.share({ title: record.name, text }).catch(()=>{/* ignore */});
+      } else {
+        // fallback copy to clipboard
+        navigator.clipboard?.writeText(text).then(
+          () => showToast('Workout copied to clipboard'),
+          () => showToast('Copy failed','error')
+        );
+      }
+    }
+
     function renderDayDetails(dateKey){
       const box = document.getElementById("dayDetails");
       const title = document.getElementById("detailsTitle");
@@ -1360,128 +1662,8 @@ function evaluateInlineCalc(raw){
           const wid = btn.getAttribute('data-workout-id');
           const record = history.find(h => h.id === wid);
           if (!record) return;
-    
-          const modal = document.getElementById('workoutDetailModal');
-          const titleEl = document.getElementById('workoutDetailTitle');
-          const body = document.getElementById('workoutDetailBody');
-    
-          titleEl.textContent = `${record.name} — ${fmtDate(record.dateKey)} • ${record.calories || 0} cal`;
-    
-          // Build breakdown
-          body.innerHTML = '';
-          const meta = document.createElement('div');
-          meta.className = 'muted';
-          meta.textContent = `${record.minutes} minutes • ${record.exercises.length} exercise${record.exercises.length !== 1 ? 's' : ''} • ${record.calories || 0} calories`;
-          body.appendChild(meta);
-    
-          record.exercises.forEach(ex => {
-            const exWrap = document.createElement('div');
-            exWrap.style.border = '1px solid var(--border)';
-            exWrap.style.borderRadius = '8px';
-            exWrap.style.padding = '10px';
-            exWrap.style.background = 'var(--panel)';
-            exWrap.style.marginTop = '8px';
-    
-            const exHeader = document.createElement('div');
-            exHeader.style.display = 'flex';
-            exHeader.style.justifyContent = 'space-between';
-            exHeader.style.alignItems = 'center';
-            exHeader.innerHTML = `<div style="font-weight:700">${ex.name}</div><div class="muted">${ex.muscle}</div>`;
-            exWrap.appendChild(exHeader);
-    
-            const setList = document.createElement('div');
-            setList.style.marginTop = '8px';
-            setList.style.display = 'flex';
-            setList.style.flexDirection = 'column';
-            setList.style.gap = '6px';
-    
-            (ex.sets || []).forEach((s, i) => {
-              const setEl = document.createElement('div');
-              setEl.style.display = 'flex';
-              setEl.style.justifyContent = 'space-between';
-              setEl.style.alignItems = 'center';
-              setEl.style.gap = '8px';
-    
-              const left = document.createElement('div');
-              left.textContent = `Set ${i+1}`;
-              left.style.fontWeight = '600';
-    
-              const right = document.createElement('div');
-              right.className = 'muted';
-              if (ex.name === 'Plank') {
-                const weightStr = s.weight ? `${s.weight}kg` : '';
-                const timeStr = s.time ? `${s.time}s` : '';
-                right.textContent = [weightStr, timeStr].filter(Boolean).join(' / ') || (s.completed ? 'Done' : '—');
-              } else if ('time' in s || 'distance' in s) {
-                const timeStr = s.time ? `${s.time}min` : '';
-                const distStr = s.distance ? `${s.distance}km` : '';
-                right.textContent = [timeStr, distStr].filter(Boolean).join(' / ') || (s.completed ? 'Done' : '—');
-              } else {
-                right.textContent = `${s.weight || 0}kg × ${s.reps || 0} reps ${s.completed ? '• ✔' : ''}`;
-              }
-    
-              setEl.appendChild(left);
-              setEl.appendChild(right);
-              setList.appendChild(setEl);
-            });
-    
-            exWrap.appendChild(setList);
-            body.appendChild(exWrap);
-          });
-    
-          // Ensure share button exists in modal footer (create if missing)
-          const modalContent = modal.querySelector('.modal-content');
-          let footer = modalContent.querySelector('.modal-footer');
-          if (!footer) {
-            footer = document.createElement('div');
-            footer.className = 'modal-footer';
-            modalContent.appendChild(footer);
-          } else {
-            footer.innerHTML = '';
-          }
-    
-          // Share button
-          const shareBtn = document.createElement('button');
-          shareBtn.className = 'btn';
-          shareBtn.id = 'shareWorkoutBtn';
-          shareBtn.textContent = 'Share';
-          shareBtn.addEventListener('click', () => {
-            // Build a concise share text
-            const parts = [];
-            parts.push(`${record.name} • ${record.minutes} min • ${record.exercises.length} exercises`);
-            record.exercises.forEach(ex => {
-              const sets = (ex.sets || []).map(s => {
-                if (ex.name === 'Plank') {
-                  return `${s.weight || 0}kg/${s.time || 0}s`;
-                } else if ('time' in s || 'distance' in s) {
-                  return `${s.time || 0}min/${s.distance || 0}km`;
-                }
-                return `${s.weight || 0}kg×${s.reps || 0}`;
-              }).join(', ');
-              parts.push(`${ex.name}: ${sets}`);
-            });
-            const text = parts.join('\n');
-            if (navigator.share) {
-              navigator.share({ title: record.name, text }).catch(()=>{/* ignore */});
-            } else {
-              // fallback copy to clipboard
-              navigator.clipboard?.writeText(text).then(()=> showToast('Workout copied to clipboard'), ()=> showToast('Copy failed','error'));
-            }
-          });
-    
-          // Close button (ensure also present)
-          const closeFooterBtn = document.createElement('button');
-          closeFooterBtn.className = 'btn secondary';
-          closeFooterBtn.textContent = 'Close';
-          closeFooterBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-          });
-    
-          footer.appendChild(shareBtn);
-          footer.appendChild(closeFooterBtn);
-    
-          // Show modal
-          modal.style.display = 'flex';
+
+          populateWorkoutDetailModal(record);
         });
       });
     }
@@ -1553,7 +1735,7 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
         document.getElementById('statusText').textContent = 'Sending request to AI...';
 
         const response = await ai.models.generateContent({
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash-lite',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
@@ -1622,20 +1804,39 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
       }
     }
 
-    // Generate workout summary
-    async function generateWorkoutSummary(currentWorkout) {
+    // Generate workout summary and persist it to the corresponding history record
+    // New signature: generateWorkoutSummary(recordId?)
+    // - recordId optional for backward safety. If an object is passed (legacy), use it; if missing, fallback to last history entry.
+    async function generateWorkoutSummary(recordId) {
       const apiKey = loadApiKey();
       if (!apiKey) {
         showToast('Set Gemini API key for workout summaries', 'warn');
         return;
       }
 
-      // Get past workouts of same name
-      const pastWorkouts = history.filter(h => h.name === currentWorkout.name && h.dateKey !== currentWorkout.dateKey).sort((a,b) => b.dateKey.localeCompare(a.dateKey)).slice(0,3);
+      // Resolve target record for summary + past workouts
+      let rec = null;
+      if (typeof recordId === 'string') {
+        rec = history.find(r => r.id === recordId) || history[history.length - 1] || null;
+      } else if (recordId && typeof recordId === 'object') {
+        // Backward compatibility: old callers may pass the full record
+        rec = recordId;
+        recordId = rec.id;
+      } else {
+        rec = history[history.length - 1] || null;
+      }
 
-      const prompt = `Analyze this workout and provide a concise summary with ratings.
+      // Build prompt context
+      const pastWorkouts = rec
+        ? history
+            .filter(h => h.name === rec.name && h.dateKey !== rec.dateKey)
+            .sort((a,b) => b.dateKey.localeCompare(a.dateKey))
+            .slice(0,3)
+        : [];
 
-Current workout: ${JSON.stringify(currentWorkout)}
+      const prompt = `You are a Gym master who gives valuable feedback and points out critical and important things, Analyze this workout and provide a concise summary with ratings.
+
+Current workout: ${JSON.stringify(rec || {})}
 
 Past workouts: ${JSON.stringify(pastWorkouts)}
 
@@ -1653,7 +1854,7 @@ Keep everything minimal and actionable.`;
       try {
         const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash-lite',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
@@ -1669,23 +1870,160 @@ Keep everything minimal and actionable.`;
             }
           }
         });
+
         const result = JSON.parse(response.candidates[0].content.parts[0].text);
-        const calories = calculateWorkoutCalories(currentWorkout);
+
+        // Build sanitized summary object (strings/arrays only) + timestamp
+        const sanitizedSummary = {};
+        if (typeof result.rating === 'string' && result.rating.trim()) {
+          sanitizedSummary.rating = result.rating.trim();
+        }
+        if (typeof result.keyMetrics === 'string' && result.keyMetrics.trim()) {
+          sanitizedSummary.keyMetrics = result.keyMetrics.trim();
+        }
+        if (typeof result.comparison === 'string' && result.comparison.trim()) {
+          sanitizedSummary.comparison = result.comparison.trim();
+        }
+        if (Array.isArray(result.tips)) {
+          const tips = result.tips
+            .filter(t => typeof t === 'string' && t.trim())
+            .map(t => t.trim());
+          if (tips.length) sanitizedSummary.tips = tips;
+        } else if (typeof result.tips === 'string' && result.tips.trim()) {
+          sanitizedSummary.tips = result.tips.trim();
+        }
+        sanitizedSummary.generatedAt = Date.now();
+
+        // Attach to in-memory record and persist if available
+        if (rec) {
+          rec.summary = sanitizedSummary;
+          saveHistory(); // lets saveHistory handle Firestore vs localStorage
+        }
+
+        // Continue existing UX: show summary modal
+        const calories = Number.isFinite(rec?.calories) ? rec.calories : (rec ? calculateWorkoutCalories({ exercises: rec.exercises }) : 0);
         showWorkoutSummaryModal(result, calories);
       } catch (error) {
         console.error('Error generating summary:', error);
+        // Do not block UX; notify and exit
         showToast('Failed to generate workout summary', 'error');
       }
     }
 
     function showWorkoutSummaryModal(result, calories) {
-      document.getElementById('summaryContent').innerHTML = `
-        <p><strong>Rating:</strong> ${result.rating}</p>
-        <p><strong>Calories Burned:</strong> ${calories} cal</p>
-        <p><strong>Key Metrics:</strong> ${result.keyMetrics}</p>
-        <p><strong>Comparison:</strong> ${result.comparison}</p>
-        <p><strong>Tips:</strong> ${result.tips}</p>
-      `;
+      const container = document.getElementById('summaryContent');
+      // Clear any previous content
+      container.innerHTML = '';
+
+      // Guard against missing or malformed result
+      const isObject = result && typeof result === 'object';
+      if (!isObject) {
+        const ul = document.createElement('ul');
+        const li = document.createElement('li');
+        li.textContent = 'Summary unavailable.';
+        ul.appendChild(li);
+        container.appendChild(ul);
+        document.getElementById('summaryModal').style.display = 'flex';
+        return;
+      }
+
+      // Helper to normalize possibly-string fields into string arrays
+      const splitToItems = (val, { bySentences = false } = {}) => {
+        if (Array.isArray(val)) {
+          return val.map(v => String(v).trim()).filter(Boolean);
+        }
+        if (typeof val === 'string') {
+          let items = [];
+          const s = val.trim();
+          if (!s) return [];
+          if (bySentences) {
+            items = s.split(/(?<=[.!?])\s+/g);
+          } else {
+            // Split on newline, bullet, semicolon, or comma if it looks enumerated
+            if (s.includes('\n')) items = s.split('\n');
+            else if (s.includes('•')) items = s.split('•');
+            else if (s.includes(';')) items = s.split(';');
+            else if (s.includes(',')) items = s.split(',');
+            else items = [s];
+          }
+          return items.map(t => t.replace(/^\s*[-•]\s*/, '').trim()).filter(Boolean);
+        }
+        return [];
+      };
+
+      const root = document.createElement('ul');
+
+      // Rating
+      if (typeof result.rating === 'string' && result.rating.trim()) {
+        const li = document.createElement('li');
+        li.textContent = `Rating: ${result.rating.trim()}`;
+        root.appendChild(li);
+      }
+
+      // Calories
+      if (Number.isFinite(calories)) {
+        const li = document.createElement('li');
+        li.textContent = `Calories Burned: ${calories} cal`;
+        root.appendChild(li);
+      }
+
+      // Key Metrics
+      const metricsItems = splitToItems(result.keyMetrics);
+      if (metricsItems.length > 0) {
+        const li = document.createElement('li');
+        li.textContent = 'Key Metrics:';
+        const ul = document.createElement('ul');
+        metricsItems.forEach(m => {
+          const mi = document.createElement('li');
+          mi.textContent = m;
+          ul.appendChild(mi);
+        });
+        li.appendChild(ul);
+        root.appendChild(li);
+      }
+
+      // Comparison
+      const comparisonItems = splitToItems(result.comparison, { bySentences: true });
+      if (comparisonItems.length > 0) {
+        const li = document.createElement('li');
+        li.textContent = 'Comparison:';
+        const ul = document.createElement('ul');
+        comparisonItems.forEach(c => {
+          const ci = document.createElement('li');
+          ci.textContent = c;
+          ul.appendChild(ci);
+        });
+        li.appendChild(ul);
+        root.appendChild(li);
+      } else if (typeof result.comparison === 'string' && result.comparison.trim()) {
+        const li = document.createElement('li');
+        li.textContent = `Comparison: ${result.comparison.trim()}`;
+        root.appendChild(li);
+      }
+
+      // Tips
+      const tipsItems = splitToItems(result.tips);
+      if (tipsItems.length > 0) {
+        const li = document.createElement('li');
+        li.textContent = 'Tips:';
+        const ul = document.createElement('ul');
+        tipsItems.forEach(t => {
+          const ti = document.createElement('li');
+          ti.textContent = t;
+          ul.appendChild(ti);
+        });
+        li.appendChild(ul);
+        root.appendChild(li);
+      }
+
+      // If nothing was added, show a generic fallback
+      if (!root.children.length) {
+        const li = document.createElement('li');
+        li.textContent = 'Summary unavailable.';
+        root.appendChild(li);
+      }
+
+      container.appendChild(root);
       document.getElementById('summaryModal').style.display = 'flex';
     }
 
@@ -1765,10 +2103,21 @@ Keep everything minimal and actionable.`;
       const search = document.getElementById("searchInput");
       search.addEventListener("input", renderLibrary);
 
-      // Toggle custom exercise form in selector
+      // Open custom exercise modal (replaces inline toggle)
       document.getElementById("toggleCustomExerciseFormBtn").addEventListener("click", () => {
-        const form = document.getElementById('customExerciseForm');
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        const modal = document.getElementById('customExerciseModal');
+        if (modal) {
+          // Reset fields to sensible defaults
+          const nameEl = document.getElementById('customNameSelector');
+          const linkEl = document.getElementById('customLinkSelector');
+          const setsEl = document.getElementById('customDefaultSetsSelector');
+          const repsEl = document.getElementById('customDefaultRepsSelector');
+          if (nameEl) nameEl.value = '';
+          if (linkEl) linkEl.value = '';
+          if (setsEl) setsEl.value = '3';
+          if (repsEl) repsEl.value = '10';
+          modal.style.display = 'flex';
+        }
       });
 
       // Library actions (delegated)
@@ -1871,8 +2220,8 @@ Keep everything minimal and actionable.`;
         replaceMode = { ei: null, active: false };
       });
 
-      // Custom exercise in selector
-      document.getElementById('saveCustomExerciseSelectorBtn').addEventListener('click', () => {
+      // Custom exercise modal save
+      document.getElementById('customExerciseSaveBtn').addEventListener('click', () => {
         const name = document.getElementById('customNameSelector').value.trim();
         const muscle = document.getElementById('customMuscleSelector').value;
         const trackingType = document.getElementById('customTrackingTypeSelector').value;
@@ -1885,7 +2234,7 @@ Keep everything minimal and actionable.`;
           return;
         }
 
-        // Create the exercise object
+        // Create the exercise object (same schema as before)
         const newExercise = {
           name,
           muscle,
@@ -1899,22 +2248,35 @@ Keep everything minimal and actionable.`;
         // Add to ALL_EXERCISES
         ALL_EXERCISES.push(newExercise);
 
-        // Add to selected exercises
+        // Mark as selected in current selector context
         selectedExercises.add(name);
 
-        // Clear form
-        document.getElementById('customNameSelector').value = '';
-        document.getElementById('customLinkSelector').value = '';
-        document.getElementById('customExerciseForm').style.display = 'none';
+        // Close and clear modal
+        const modal = document.getElementById('customExerciseModal');
+        if (modal) modal.style.display = 'none';
+        const nameEl = document.getElementById('customNameSelector');
+        const linkEl = document.getElementById('customLinkSelector');
+        if (nameEl) nameEl.value = '';
+        if (linkEl) linkEl.value = '';
 
-        // Re-render the selector grid to show the new exercise
+        // Update selector grid
         renderExerciseSelector();
 
-        showToast('Custom exercise created and selected!');
+        showToast('Custom exercise created and selected!', 'success');
       });
 
-      document.getElementById('cancelCustomExerciseSelectorBtn').addEventListener('click', () => {
-        document.getElementById('customExerciseForm').style.display = 'none';
+      // Custom exercise modal cancel
+      document.getElementById('customExerciseCancelBtn').addEventListener('click', () => {
+        const modal = document.getElementById('customExerciseModal');
+        if (modal) modal.style.display = 'none';
+        const nameEl = document.getElementById('customNameSelector');
+        const linkEl = document.getElementById('customLinkSelector');
+        const setsEl = document.getElementById('customDefaultSetsSelector');
+        const repsEl = document.getElementById('customDefaultRepsSelector');
+        if (nameEl) nameEl.value = '';
+        if (linkEl) linkEl.value = '';
+        if (setsEl) setsEl.value = '3';
+        if (repsEl) repsEl.value = '10';
       });
 
       // Exercise options modal

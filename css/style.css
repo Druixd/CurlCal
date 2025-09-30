@@ -57,7 +57,7 @@
     /* Mobile-first responsive container */
     @media (max-width: 768px) {
       .container {
-        max-width: 420px;
+        /* max-width: 420px; */
       }
     }
     header.app-header{
@@ -308,10 +308,10 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: var(--card);
-      padding: 20px;
+      padding: 16px;
       display:flex;
       flex-direction:column;
-      gap: 16px;
+      gap: 12px;
       transition: all 0.2s ease;
       box-shadow: var(--shadow-sm);
     }
@@ -830,7 +830,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: 9999;
       padding: 20px;
     }
 
@@ -841,34 +841,62 @@
     }
     .modal-content{
       background: var(--card);
-      padding: 16px;
+      padding: 20px;
       border-radius: var(--radius);
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      min-width: 280px;
+      gap: 16px;
+      min-width: 320px;
       max-width: 90vw;
       width: auto;
-      max-height: 90vh;
+      max-height: 70vh;
       height: auto;
       overflow: hidden;
       transform: scale(0.95);
       opacity: 0;
       animation: modalIn 200ms ease-out forwards;
       box-shadow: var(--shadow);
+      z-index: 11;
+    }
+
+    /* Desktop modal improvements */
+    @media (min-width: 1024px) {
+      #workoutDetailModal .modal-content {
+        max-width: 900px;
+        width: 900px;
+        padding: 24px;
+      }
     }
     .modal-content h3{
       margin: 0;
       font-size: 18px;
       font-weight: 700;
-      overflow: hidden;
+      overflow: visible;
       flex-shrink: 0;
+      word-wrap: break-word;
+      word-break: break-word;
+      white-space: normal;
+      line-height: 1.3;
+      max-width: calc(100% - 80px);
+      min-width: 0;
     }
 
     .modal-content > *:not(h3):not(.modal-footer) {
-      overflow-y: auto;
+      overflow-y: hidden;
       flex: 1;
       min-height: 0;
+    }
+
+    /* Workout Detail Modal Content Constraints */
+    #workoutDetailModal .modal-content {
+      max-height: 80vh;
+      overflow: auto;
+      scroll-behavior: smooth;
+    }
+
+    #workoutDetailModal .modal-content > div:not(.modal-footer) {
+      max-height: calc(80vh - 120px);
+      overflow: visible;
     }
 
     .modal-footer {
@@ -982,7 +1010,7 @@
       text-align: center;
     }
     @media (min-width: 1024px){
-      .toast{ left: auto; right: 20px; bottom: 20px; transform: translate(20px, 20px); }
+      .toast{ left: auto; right: 20px; top: 20px; bottom: auto; transform: translate(20px, -20px); }
     }
     .toast.show{
       transform: translate(-50%, 0);
@@ -1164,9 +1192,10 @@
 
       .modal-content {
         max-width: 95vw;
-        max-height: 95vh;
-        padding: 12px;
-        gap: 8px;
+        max-height: 80vh;
+        padding: 16px;
+        padding-bottom: 32px;
+        gap: 12px;
       }
 
       #exerciseSelectorModal .filter-chips {
@@ -1203,7 +1232,8 @@
       }
       
       .card {
-        padding: 16px;
+        padding: 12px;
+        gap: 10px;
       }
       
       .set {
@@ -1216,3 +1246,322 @@
         --cell: 36px;
       }
     }
+/* Summary modal list styling */
+#summaryContent ul {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+#summaryContent li {
+  margin: 0.25rem 0;
+  line-height: 1.4;
+}
+
+/* Workout Detail Modal Styles */
+.workout-summary-section {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (min-width: 768px) {
+  .summary-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .summary-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+  }
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.ai-summary-section {
+  background: linear-gradient(135deg, rgba(0, 212, 240, 0.05), rgba(156, 228, 25, 0.05));
+  border: 1px solid rgba(0, 212, 240, 0.2);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.ai-summary-content {
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.ai-summary-content ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.ai-summary-content li {
+  margin: 4px 0;
+}
+
+.exercise-breakdown-section {
+   background: var(--panel);
+   border: 1px solid var(--border);
+   border-radius: var(--radius);
+   padding: 16px;
+   flex-shrink: 0;
+}
+
+.exercise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.exercise-item {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.exercise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.exercise-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.exercise-muscle {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sets-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.set-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--card);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+}
+
+.set-number {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.set-data {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.set-completed {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Modal footer improvements - Universal sticky positioning for all screen sizes */
+.modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  background: var(--card);
+  z-index: 10;
+}
+
+/* Desktop modal button adjustments */
+@media (min-width: 768px) {
+  #workoutDetailModal .modal-footer {
+    margin: 16px -20px -20px -20px;
+    padding: 16px 20px;
+    border-top: 2px solid var(--border);
+  }
+}
+
+/* Responsive adjustments for workout detail modal */
+@media (max-width: 767px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .summary-item {
+    gap: 2px;
+  }
+
+  .summary-label {
+    font-size: 11px;
+  }
+
+  .summary-value {
+    font-size: 14px;
+  }
+
+  .workout-summary-section,
+  .ai-summary-section,
+  .exercise-breakdown-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .exercise-breakdown-section {
+    padding-bottom: 16px;
+  }
+
+  /* Ensure modal body has sufficient bottom padding on mobile */
+  #workoutDetailModal .modal-content > div:not(.modal-footer) {
+    padding-bottom: 20px;
+    margin-bottom: 16px;
+  }
+
+  /* Ensure modal footer buttons are accessible on mobile */
+  .modal-footer {
+    padding: 16px 0;
+    background: var(--card);
+    margin: 16px -16px -16px -16px;
+    border-top: 2px solid var(--border);
+  }
+
+  /* Add extra bottom padding for very small mobile screens */
+  @media (max-width: 480px) {
+    .modal-content {
+      padding-bottom: 40px;
+      max-height: 90vh; /* Increase from 80vh for very small screens */
+      height: auto;
+      min-height: auto;
+    }
+
+    .exercise-breakdown-section {
+      padding-bottom: 16px;
+    }
+    }
+  }
+
+  /* Mobile modal scrolling and positioning fixes */
+  @media (max-width: 767px) {
+    /* Universal modal content scrolling for mobile */
+    .modal-content {
+      max-height: 80vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+
+    /* Fix modal body scrolling for all modals */
+    #workoutDetailModal #workoutDetailBody {
+      max-height: calc(80vh - 120px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+      padding-bottom: 20px; /* Add padding to ensure content isn't hidden behind sticky footer */
+    }
+
+    /* Ensure modal footer stays at bottom on mobile */
+    #workoutDetailModal .modal-footer {
+      margin: 16px -16px -16px -16px;
+      padding: 16px;
+      border-top: 2px solid var(--border);
+      position: sticky;
+      bottom: 0;
+      background: var(--card);
+      z-index: 10;
+    }
+
+    /* General modal footer mobile adjustments */
+    .modal-footer {
+      margin: 16px -16px -16px -16px;
+      padding: 16px;
+      border-top: 2px solid var(--border);
+    }
+  }
+
+  /* Additional fixes for very small mobile screens (under 480px) */
+  @media (max-width: 480px) {
+    /* Improve modal content scrolling */
+    .modal-content {
+      max-height: 92vh; /* Use more screen space on very small devices */
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+
+    /* Ensure modal body has proper scroll area */
+    #workoutDetailModal #workoutDetailBody {
+      max-height: calc(92vh - 160px); /* Account for header and footer */
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+      padding-bottom: 24px; /* Extra padding for very small screens */
+    }
+
+    /* Fix sticky footer behavior on very small screens */
+    #workoutDetailModal .modal-footer {
+      position: sticky;
+      bottom: 0;
+      background: var(--card);
+      z-index: 10;
+      margin: 20px -16px -16px -16px;
+      padding: 16px;
+      border-top: 2px solid var(--border);
+      /* Ensure footer doesn't interfere with scrolling */
+      flex-shrink: 0;
+    }
+
+    /* Prevent modal content from being hidden */
+    #workoutDetailModal .modal-content > div:not(.modal-footer) {
+      padding-bottom: 20px;
+      margin-bottom: 20px;
+    }
+  }
+}
