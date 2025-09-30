@@ -6,3 +6,6 @@ firebase-debug.log
 
 .firebase/
 .ignore/
+
+image/
+curlcal.md
