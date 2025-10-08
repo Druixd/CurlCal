@@ -314,7 +314,7 @@ function evaluateInlineCalc(raw){
 
     // Inline calculator utilities
     function loadInlineCalc(){
-      return localStorage.getItem(LS_INLINE_CALC) !== "false"; // default true
+      return localStorage.getItem(LS_INLINE_CALC) === "true"; // default false
     }
     function saveInlineCalc(enabled){
       localStorage.setItem(LS_INLINE_CALC, enabled.toString());
