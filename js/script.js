@@ -19,6 +19,7 @@
           document.getElementById('breakDurationSelect').value = loadBreakDuration().toString();
           document.getElementById('autoRestTimerToggle').checked = loadAutoRest();
           document.getElementById('soundEffectsToggle').checked = loadSoundEffects();
+          document.getElementById('inlineCalcToggle').checked = loadInlineCalc();
           document.getElementById('weightInput').value = loadUserWeight().toString();
           document.getElementById('heightInput').value = loadUserHeight().toString();
           document.getElementById('apiKeyMessage').style.display = loadApiKey() ? 'none' : 'block';
@@ -134,6 +135,7 @@
     const LS_USER_WEIGHT = "GYM_USER_WEIGHT_V1";
     const LS_USER_HEIGHT = "GYM_USER_HEIGHT_V1";
     const LS_SOUND_EFFECTS = "GYM_SOUND_EFFECTS_V1";
+    const LS_INLINE_CALC = "GYM_INLINE_CALC_V1";
 
     // Use comprehensive exercise database
     const ALL_EXERCISES = COMPREHENSIVE_EXERCISES.map(ex => ({
@@ -308,6 +310,14 @@ function evaluateInlineCalc(raw){
     }
     function saveSoundEffects(enabled){
       localStorage.setItem(LS_SOUND_EFFECTS, enabled.toString());
+    }
+
+    // Inline calculator utilities
+    function loadInlineCalc(){
+      return localStorage.getItem(LS_INLINE_CALC) !== "false"; // default true
+    }
+    function saveInlineCalc(enabled){
+      localStorage.setItem(LS_INLINE_CALC, enabled.toString());
     }
 
     // Calorie calculation utilities
@@ -728,13 +738,13 @@ function evaluateInlineCalc(raw){
                 <div class="set" data-ex="${ei}" data-set="${si}">
                   <div class="index set-index-btn" data-ei="${ei}" data-si="${si}">${si+1}</div>
                   ${ex.name === 'Plank' ? `
-                    <input type="text" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
+                    <input type="${loadInlineCalc() ? 'text' : 'text'}" inputmode="${loadInlineCalc() ? 'text' : 'decimal'}" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
                     <input type="text" inputmode="numeric" step="1" placeholder="Time (sec)" value="${s.time ?? ''}" data-time />
                   ` : isTimeDistance ? `
                     <input type="text" inputmode="decimal" step="0.1" placeholder="Time (min)" value="${s.time ?? ''}" data-time />
                     <input type="text" inputmode="decimal" step="0.1" placeholder="Distance (km)" value="${s.distance ?? ''}" data-distance />
                   ` : `
-                    <input type="text" inputmode="decimal" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
+                    <input type="${loadInlineCalc() ? 'text' : 'text'}" inputmode="${loadInlineCalc() ? 'text' : 'decimal'}" step="0.5" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
                     <input type="text" inputmode="numeric" step="1" placeholder="Reps" value="${s.reps ?? ''}" data-reps />
                   `}
                   <div class="complete ${s.completed?'checked':''}" data-complete title="Mark set complete">
@@ -832,7 +842,7 @@ function evaluateInlineCalc(raw){
       // If the input ends with an operator or a trailing decimal point,
       // don't evaluate yet to allow typing decimals like "22.5" or "10+"
       const trailingOperator = /[+\-*/.]$/.test(trimmed);
-      const evaluated = trailingOperator ? null : evaluateInlineCalc(raw);
+      const evaluated = loadInlineCalc() && !trailingOperator ? evaluateInlineCalc(raw) : null;
     
       // Decide value to persist
       let val;
@@ -850,7 +860,7 @@ function evaluateInlineCalc(raw){
       }
     
       // Only replace the field when we got a clean evaluation and it's not an incomplete expression
-      if (evaluated !== null) {
+      if (loadInlineCalc() && evaluated !== null) {
         target.value = String(val);
       }
     
@@ -2096,12 +2106,14 @@ Keep everything minimal and actionable.`;
           const breakDurationValue = parseInt(document.getElementById('breakDurationSelect').value);
           const autoRestEnabled = document.getElementById('autoRestTimerToggle').checked;
           const soundEffectsEnabled = document.getElementById('soundEffectsToggle').checked;
+          const inlineCalcEnabled = document.getElementById('inlineCalcToggle').checked;
           const weightValue = parseFloat(document.getElementById('weightInput').value) || 70;
           const heightValue = parseFloat(document.getElementById('heightInput').value) || 5.8;
           saveApiKey(key);
           saveBreakDuration(breakDurationValue);
           saveAutoRest(autoRestEnabled);
           saveSoundEffects(soundEffectsEnabled);
+          saveInlineCalc(inlineCalcEnabled);
           saveUserWeight(weightValue);
           saveUserHeight(heightValue);
           breakDuration = breakDurationValue;
