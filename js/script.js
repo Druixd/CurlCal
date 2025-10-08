@@ -157,6 +157,7 @@
     let breakTimerInterval = null;
     let breakTimeRemaining = 0;
     let breakDuration = 90; // default 90 seconds
+    let breakStartTime = null; // for accurate timing when app is backgrounded
 
     // ===== Utilities =====
     function loadHistory(){
@@ -384,12 +385,15 @@ function evaluateInlineCalc(raw){
 
     function startBreakTimer(){
       if(breakTimerInterval) clearInterval(breakTimerInterval);
+      breakStartTime = Date.now();
       breakTimeRemaining = breakDuration;
       updateBreakDisplay();
       document.getElementById('breakModal').style.display = 'flex';
 
       breakTimerInterval = setInterval(() => {
-        breakTimeRemaining--;
+        // Calculate remaining time based on elapsed time for accuracy when app is backgrounded
+        const elapsed = Math.floor((Date.now() - breakStartTime) / 1000);
+        breakTimeRemaining = Math.max(0, breakDuration - elapsed);
         updateBreakDisplay();
         if(breakTimeRemaining <= 0){
           endBreakTimer();
@@ -400,6 +404,7 @@ function evaluateInlineCalc(raw){
     function endBreakTimer(){
       if(breakTimerInterval) clearInterval(breakTimerInterval);
       breakTimerInterval = null;
+      breakStartTime = null;
       document.getElementById('breakModal').style.display = 'none';
       showToast("Break ended", "success");
       // Play sound effect when timer ends
@@ -414,6 +419,10 @@ function evaluateInlineCalc(raw){
     }
 
     function modifyBreakTime(seconds){
+      // Adjust the start time to account for manual time changes
+      if (breakStartTime) {
+        breakStartTime += seconds * 1000; // adjust start time by the seconds added/subtracted
+      }
       breakTimeRemaining = Math.max(0, breakTimeRemaining + seconds);
       updateBreakDisplay();
     }
