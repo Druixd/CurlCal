@@ -2118,7 +2118,7 @@ Keep everything minimal and actionable.`;
         const modal = document.getElementById('customExerciseModal');
         if (modal) {
           // Reset fields to sensible defaults
-          const nameEl = document.getElementById('customNameSelector');
+          const nameEl = document.getElementById('customExerciseNameInput');
           const linkEl = document.getElementById('customLinkSelector');
           const setsEl = document.getElementById('customDefaultSetsSelector');
           const repsEl = document.getElementById('customDefaultRepsSelector');
@@ -2232,7 +2232,7 @@ Keep everything minimal and actionable.`;
 
       // Custom exercise modal save
       document.getElementById('customExerciseSaveBtn').addEventListener('click', () => {
-        const name = document.getElementById('customNameSelector').value.trim();
+        const name = document.getElementById('customExerciseNameInput').value.trim();
         const muscle = document.getElementById('customMuscleSelector').value;
         const trackingType = document.getElementById('customTrackingTypeSelector').value;
         const defaultSets = parseInt(document.getElementById('customDefaultSetsSelector').value) || 3;
@@ -2264,7 +2264,7 @@ Keep everything minimal and actionable.`;
         // Close and clear modal
         const modal = document.getElementById('customExerciseModal');
         if (modal) modal.style.display = 'none';
-        const nameEl = document.getElementById('customNameSelector');
+        const nameEl = document.getElementById('customExerciseNameInput');
         const linkEl = document.getElementById('customLinkSelector');
         if (nameEl) nameEl.value = '';
         if (linkEl) linkEl.value = '';
@@ -2279,7 +2279,7 @@ Keep everything minimal and actionable.`;
       document.getElementById('customExerciseCancelBtn').addEventListener('click', () => {
         const modal = document.getElementById('customExerciseModal');
         if (modal) modal.style.display = 'none';
-        const nameEl = document.getElementById('customNameSelector');
+        const nameEl = document.getElementById('customExerciseNameInput');
         const linkEl = document.getElementById('customLinkSelector');
         const setsEl = document.getElementById('customDefaultSetsSelector');
         const repsEl = document.getElementById('customDefaultRepsSelector');
