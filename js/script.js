@@ -18,6 +18,7 @@
           document.getElementById('apiKeyInput').value = loadApiKey();
           document.getElementById('breakDurationSelect').value = loadBreakDuration().toString();
           document.getElementById('autoRestTimerToggle').checked = loadAutoRest();
+          document.getElementById('soundEffectsToggle').checked = loadSoundEffects();
           document.getElementById('weightInput').value = loadUserWeight().toString();
           document.getElementById('heightInput').value = loadUserHeight().toString();
           document.getElementById('apiKeyMessage').style.display = loadApiKey() ? 'none' : 'block';
@@ -132,6 +133,7 @@
     const LS_EXERCISE_PREFS = "GYM_EXERCISE_PREFS_V1";
     const LS_USER_WEIGHT = "GYM_USER_WEIGHT_V1";
     const LS_USER_HEIGHT = "GYM_USER_HEIGHT_V1";
+    const LS_SOUND_EFFECTS = "GYM_SOUND_EFFECTS_V1";
 
     // Use comprehensive exercise database
     const ALL_EXERCISES = COMPREHENSIVE_EXERCISES.map(ex => ({
@@ -299,6 +301,14 @@ function evaluateInlineCalc(raw){
       localStorage.setItem(LS_USER_HEIGHT, height.toString());
     }
 
+    // Sound effects utilities
+    function loadSoundEffects(){
+      return localStorage.getItem(LS_SOUND_EFFECTS) !== "false"; // default true
+    }
+    function saveSoundEffects(enabled){
+      localStorage.setItem(LS_SOUND_EFFECTS, enabled.toString());
+    }
+
     // Calorie calculation utilities
     function calculateWorkoutCalories(workout){
       if(!workout || !workout.exercises) return 0;
@@ -335,6 +345,13 @@ function evaluateInlineCalc(raw){
       // BMR = 88.362 + (13.397 × weight in kg) + (4.799 × height in cm) - (5.677 × age in years)
       const bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
       return Math.round(bmr);
+    }
+
+    // Sound effect utilities
+    function playSound(soundFile){
+      if(!loadSoundEffects()) return;
+      const audio = new Audio(`sfx/${soundFile}`);
+      audio.play().catch(e => console.log('Sound play failed:', e));
     }
     function cleanObject(obj) {
       if (obj === null || typeof obj !== 'object') return obj;
@@ -385,6 +402,8 @@ function evaluateInlineCalc(raw){
       breakTimerInterval = null;
       document.getElementById('breakModal').style.display = 'none';
       showToast("Break ended", "success");
+      // Play sound effect when timer ends
+      playSound('timer_end.mp3');
     }
 
     function updateBreakDisplay(){
@@ -891,6 +910,11 @@ function evaluateInlineCalc(raw){
       btnEl.innerHTML = s.completed ? "&#10003;" : "";
       updateWorkoutProgressBar();
 
+      // Play sound effect when set is completed
+      if(s.completed){
+        playSound('set_complete.mp3');
+      }
+
       // Auto-trigger break if set is completed and auto rest is enabled
       if(s.completed && loadAutoRest()){
         startBreakTimer();
@@ -902,6 +926,8 @@ function evaluateInlineCalc(raw){
       ex.sets.forEach(s => s.completed = true);
       saveActiveWorkout();
       renderWorkout();
+      // Play sound effect when all sets of exercise are completed
+      playSound('all_sets_complete.mp3');
     }
 
     function handleSetIndexClick(ei, si, btnEl){
@@ -1023,6 +1049,9 @@ function evaluateInlineCalc(raw){
       saveActiveWorkout();
       updateResumeChip();
       clearInterval(workoutTimerInterval);
+
+      // Play sound effect when workout is completed
+      playSound('workout_complete.mp3');
 
       setTab("calendar");
       renderCalendar();
@@ -2057,11 +2086,13 @@ Keep everything minimal and actionable.`;
           const key = document.getElementById('apiKeyInput').value.trim();
           const breakDurationValue = parseInt(document.getElementById('breakDurationSelect').value);
           const autoRestEnabled = document.getElementById('autoRestTimerToggle').checked;
+          const soundEffectsEnabled = document.getElementById('soundEffectsToggle').checked;
           const weightValue = parseFloat(document.getElementById('weightInput').value) || 70;
           const heightValue = parseFloat(document.getElementById('heightInput').value) || 5.8;
           saveApiKey(key);
           saveBreakDuration(breakDurationValue);
           saveAutoRest(autoRestEnabled);
+          saveSoundEffects(soundEffectsEnabled);
           saveUserWeight(weightValue);
           saveUserHeight(heightValue);
           breakDuration = breakDurationValue;
