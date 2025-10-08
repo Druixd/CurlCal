@@ -1772,6 +1772,16 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
 
         document.getElementById('statusText').textContent = 'Parsing workout data...';
 
+        // Fix broken AI-generated exercise links by matching with comprehensive database
+        workout.exercises.forEach(ex => {
+          const matchingEx = COMPREHENSIVE_EXERCISES.find(ce => ce.name.toLowerCase() === ex.name.toLowerCase());
+          if (matchingEx) {
+            ex.exercise_link = matchingEx.exercise_link;
+          } else {
+            ex.exercise_link = '';
+          }
+        });
+
         workout.isCustom = true;
 
         document.getElementById('statusText').textContent = 'Saving workout to library...';
