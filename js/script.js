@@ -253,6 +253,18 @@
     })).sort((a, b) => a.name.localeCompare(b.name));
     const BASE_WORKOUT_TEMPLATES = WORKOUT_TEMPLATES.map(w => ({ ...w }));
     const BASE_ALL_EXERCISES = ALL_EXERCISES.map(ex => ({ ...ex }));
+    const COMMON_WORKOUT_PRIORITY_IDS = [
+      "bodyweight-only",
+      "home-workout",
+      "strength-endurance",
+      "chest-beginner",
+      "back-beginner",
+      "shoulders-beginner",
+      "legs-beginner",
+      "push-superset-blast",
+      "pull-superset-builder",
+      "leg-superset-density"
+    ];
 
     function truncateName(name, maxLen = 12) {
       return name.length > maxLen ? name.substring(0, maxLen) + '...' : name;
@@ -266,6 +278,7 @@
     let calendarCursor = new Date(); // month being viewed
     let workoutTimerInterval = null;
     let selectedExerciseIndex = null;
+    let selectedStructuredExerciseRef = null; // { bi, ri, ei }
     let activeDeleteSet = null; // {ei, si} or null
     let breakTimerInterval = null;
     let breakTimeRemaining = 0;
@@ -349,10 +362,206 @@
         setTimeout(()=> toast.classList.remove("show"), 2200);
       });
     }
+    function hasStructuredBlocks(workout){
+      return !!(workout && Array.isArray(workout.blocks) && workout.blocks.length);
+    }
+
+    function getStructuredBlockExerciseNameSet(workout){
+      const names = new Set();
+      if(!hasStructuredBlocks(workout)) return names;
+      (workout.blocks || []).forEach(block => {
+        (block.exercises || []).forEach(ex => {
+          if(ex?.name) names.add(String(ex.name).toLowerCase());
+        });
+      });
+      return names;
+    }
+
+    function forEachWorkoutSet(workout, cb){
+      if(!workout) return;
+      if(hasStructuredBlocks(workout)){
+        const groupedNames = getStructuredBlockExerciseNameSet(workout);
+        workout.blocks.forEach((block, bi) => {
+          (block.roundEntries || []).forEach((round, ri) => {
+            (round.exercises || []).forEach((ex, ei) => {
+              (ex.sets || []).forEach((set, si) => cb(set, ex, { bi, ri, ei, si, block, round }));
+            });
+          });
+        });
+        (workout.exercises || []).forEach((ex, ei) => {
+          if(groupedNames.has(String(ex?.name || "").toLowerCase())) return;
+          (ex.sets || []).forEach((set, si) => cb(set, ex, { ei, si, standalone: true }));
+        });
+        return;
+      }
+      (workout.exercises || []).forEach((ex, ei) => {
+        (ex.sets || []).forEach((set, si) => cb(set, ex, { ei, si }));
+      });
+    }
+
+    function countTotalSets(workout){
+      let count = 0;
+      forEachWorkoutSet(workout, () => { count += 1; });
+      return count;
+    }
+
     function countCompletedSets(workout){
       let count = 0;
-      workout.exercises.forEach(ex => ex.sets?.forEach(s => { if(s.completed) count++; }));
+      forEachWorkoutSet(workout, (set) => { if(set.completed) count += 1; });
       return count;
+    }
+
+    function createSetFromExercise(ex, pref = {}, completed = false){
+      const isTimeDistance = ex.trackingType === "time_distance";
+      if(ex.name === "Plank"){
+        return { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed };
+      }
+      if(isTimeDistance){
+        return { time: pref.lastTime || 0, distance: pref.lastDistance || 0, completed };
+      }
+      return { weight: pref.lastWeight || 0, reps: pref.lastReps || ex.defaultReps || 0, completed };
+    }
+
+    function blockTypeLabel(type){
+      switch(type){
+        case "superset": return "Superset";
+        case "compound_set": return "Compound Set";
+        case "tri_set": return "Tri-Set";
+        case "drop_set": return "Drop Set";
+        default: return "Block";
+      }
+    }
+
+    function getDropSetWeightPlaceholder(block, ex, si){
+      if(block?.type !== "drop_set" || si <= 0) return "Weight (kg)";
+      const topWeight = Number(ex?.sets?.[0]?.weight || 0);
+      if(!topWeight) return "Weight (kg)";
+      const percent = Number(block?.dropConfig?.dropPercent || 20);
+      const target = Math.max(0, Math.round((topWeight * (1 - ((percent * si) / 100))) * 10) / 10);
+      return `Weight (~${target}kg)`;
+    }
+
+    function normalizeTemplateBlocks(template){
+      if(!Array.isArray(template?.blocks)) return [];
+      return template.blocks
+        .map((block, idx) => {
+          const exercises = Array.isArray(block?.exercises) ? block.exercises : [];
+          if(exercises.length === 0) return null;
+          return {
+            id: String(block.id || String.fromCharCode(65 + idx)),
+            type: block.type || "superset",
+            rounds: Math.max(1, Number(block.rounds) || 3),
+            restSec: Math.max(0, Number(block.restSec) || 60),
+            dropConfig: block.type === "drop_set"
+              ? {
+                  drops: Math.max(1, Number(block.dropConfig?.drops) || 2),
+                  dropPercent: Math.max(5, Number(block.dropConfig?.dropPercent) || 20)
+                }
+              : null,
+            exercises: exercises.map(ex => ({
+              name: ex.name,
+              muscle: ex.muscle,
+              defaultSets: Number(ex.defaultSets) || 1,
+              defaultReps: Number(ex.defaultReps) || 10,
+              trackingType: ex.trackingType || "weight_reps",
+              exercise_link: ex.exercise_link || "",
+              met: Number(ex.met) || 5
+            }))
+          };
+        })
+        .filter(Boolean);
+    }
+
+    function flattenTemplateExercisesFromBlocks(blocks){
+      const byName = new Map();
+      blocks.forEach(block => {
+        block.exercises.forEach(ex => {
+          const key = ex.name.toLowerCase();
+          const current = byName.get(key);
+          if(!current){
+            byName.set(key, { ...ex });
+            return;
+          }
+          current.defaultSets = Math.max(Number(current.defaultSets) || 1, Number(ex.defaultSets) || 1);
+          current.defaultReps = Math.max(Number(current.defaultReps) || 1, Number(ex.defaultReps) || 1);
+        });
+      });
+      return Array.from(byName.values());
+    }
+
+    function buildActiveBlocksFromTemplate(template){
+      const blocks = normalizeTemplateBlocks(template);
+      return blocks.map(block => ({
+        ...block,
+        roundEntries: Array.from({ length: block.rounds }, () => ({
+          exercises: block.exercises.map(ex => {
+            const pref = getExercisePref(ex.name);
+            const topSet = createSetFromExercise(ex, pref, false);
+            if(block.type !== "drop_set"){
+              return { ...ex, sets: [topSet] };
+            }
+            const drops = [];
+            const dropCount = block.dropConfig?.drops || 2;
+            const dropPercent = block.dropConfig?.dropPercent || 20;
+            for(let di = 1; di <= dropCount; di++){
+              const dropSet = createSetFromExercise(ex, pref, false);
+              dropSet.dropIndex = di;
+              dropSet.dropPercent = dropPercent;
+              drops.push(dropSet);
+            }
+            topSet.dropIndex = 0;
+            topSet.dropPercent = 0;
+            return { ...ex, sets: [topSet, ...drops] };
+          })
+        }))
+      }));
+    }
+
+    function nextBlockId(blocks){
+      const used = new Set((blocks || []).map(b => String(b.id || "").toUpperCase()));
+      for(let i = 0; i < 26; i++){
+        const id = String.fromCharCode(65 + i);
+        if(!used.has(id)) return id;
+      }
+      return `B${(blocks || []).length + 1}`;
+    }
+
+    function buildRuntimeExerciseForBlock(ex, blockType, dropConfig){
+      const pref = getExercisePref(ex.name);
+      const topSet = createSetFromExercise(ex, pref, false);
+      if(blockType !== "drop_set"){
+        return {
+          name: ex.name,
+          muscle: ex.muscle,
+          exercise_link: ex.exercise_link,
+          trackingType: ex.trackingType || "weight_reps",
+          met: ex.met,
+          defaultSets: 1,
+          defaultReps: ex.defaultReps || 10,
+          sets: [topSet]
+        };
+      }
+      const drops = [];
+      const dropCount = dropConfig?.drops || 2;
+      const dropPercent = dropConfig?.dropPercent || 20;
+      for(let di = 1; di <= dropCount; di++){
+        const dropSet = createSetFromExercise(ex, pref, false);
+        dropSet.dropIndex = di;
+        dropSet.dropPercent = dropPercent;
+        drops.push(dropSet);
+      }
+      topSet.dropIndex = 0;
+      topSet.dropPercent = 0;
+      return {
+        name: ex.name,
+        muscle: ex.muscle,
+        exercise_link: ex.exercise_link,
+        trackingType: ex.trackingType || "weight_reps",
+        met: ex.met,
+        defaultSets: 1,
+        defaultReps: ex.defaultReps || 10,
+        sets: [topSet, ...drops]
+      };
     }
 
 // Inline calculation evaluator: supports digits, spaces, + - * / . and parentheses.
@@ -587,25 +796,28 @@ function evaluateInlineCalc(raw){
 
     // Calorie calculation utilities
     function calculateWorkoutCalories(workout){
-      if(!workout || !workout.exercises) return 0;
+      if(!workout) return 0;
       const userWeight = loadUserWeight();
       let totalCalories = 0;
 
-      workout.exercises.forEach(ex => {
+      const counted = new Set();
+      forEachWorkoutSet(workout, (set, ex, refs) => {
+        // Avoid double counting mirrored sets if a future migration keeps both blocks and exercises in sync.
+        const key = refs?.bi != null ? `b-${refs.bi}-${refs.ri}-${refs.ei}-${refs.si}` : `e-${refs.ei}-${refs.si}`;
+        if(counted.has(key)) return;
+        counted.add(key);
         const met = ex.met || 5; // default MET if not specified
-        ex.sets.forEach(set => {
-          if(set.completed){
-            let timeHours = 0;
-            if(ex.name === 'Plank' || ex.trackingType === 'time_distance'){
-              // For time-based exercises, use actual time in hours
-              timeHours = (set.time || 0) / 60; // convert minutes to hours
-            } else {
-              // For weight/reps exercises, estimate time per set (1 minute including rest)
-              timeHours = 1 / 60;
-            }
-            totalCalories += met * userWeight * timeHours;
+        if(set.completed){
+          let timeHours = 0;
+          if(ex.name === 'Plank' || ex.trackingType === 'time_distance'){
+            // For time-based exercises, use actual time in hours
+            timeHours = (set.time || 0) / 60; // convert minutes to hours
+          } else {
+            // For weight/reps exercises, estimate time per set (1 minute including rest)
+            timeHours = 1 / 60;
           }
-        });
+          totalCalories += met * userWeight * timeHours;
+        }
       });
 
       return Math.round(totalCalories);
@@ -748,6 +960,17 @@ function evaluateInlineCalc(raw){
       dates.sort(); // lexicographic works for YYYY-MM-DD
       return dates[dates.length-1];
     }
+    function workoutUsageCount(workoutName){
+      return history.filter(h => h.name === workoutName).length;
+    }
+    function commonWorkoutRank(workout){
+      const idx = COMMON_WORKOUT_PRIORITY_IDS.indexOf(workout.id);
+      if(idx >= 0) return idx;
+      const name = String(workout.name || "").toLowerCase();
+      if(name.includes("beginner")) return 100;
+      if(name.includes("full body") || name.includes("home workout") || name.includes("bodyweight")) return 110;
+      return 999;
+    }
     function renderLibrary(){
       const grid = document.getElementById("libraryGrid");
       const activeMuscle = document.querySelector(".chip.active")?.dataset.muscle || "All";
@@ -764,7 +987,7 @@ function evaluateInlineCalc(raw){
         })
         .filter(w => w.name.toLowerCase().includes(q));
 
-      // Sort favorites first, then custom, then name.
+      // Sort favorites first, then custom, then common/good workouts, then user-popular, then name.
       items.sort((a,b) => {
         const favA = isWorkoutFavorited(a.id) ? 1 : 0;
         const favB = isWorkoutFavorited(b.id) ? 1 : 0;
@@ -772,6 +995,15 @@ function evaluateInlineCalc(raw){
         const customA = a.isCustom ? 1 : 0;
         const customB = b.isCustom ? 1 : 0;
         if(customA !== customB) return customB - customA;
+        const commonA = commonWorkoutRank(a);
+        const commonB = commonWorkoutRank(b);
+        if(commonA !== commonB) return commonA - commonB;
+        const useA = workoutUsageCount(a.name);
+        const useB = workoutUsageCount(b.name);
+        if(useA !== useB) return useB - useA;
+        const lastA = lastPerformedDate(a.name) || "";
+        const lastB = lastPerformedDate(b.name) || "";
+        if(lastA !== lastB) return lastB.localeCompare(lastA);
         return a.name.localeCompare(b.name);
       });
 
@@ -832,10 +1064,13 @@ function evaluateInlineCalc(raw){
       const existing = document.getElementById('templatePreviewModal');
       if(existing) existing.remove();
 
+      const normalizedBlocks = normalizeTemplateBlocks(t);
+      const previewExercises = normalizedBlocks.length ? flattenTemplateExercisesFromBlocks(normalizedBlocks) : (t.exercises || []);
+
       // Calculate estimated calories for preview
       const userWeight = loadUserWeight();
       let estimatedCalories = 0;
-      t.exercises.forEach(ex => {
+      previewExercises.forEach(ex => {
         const met = ex.met || 5;
         const sets = ex.defaultSets || 3;
         // Assume 1 minute per set
@@ -862,8 +1097,18 @@ function evaluateInlineCalc(raw){
             </div>
           </div>
           <div style="margin-top:8px; color:var(--muted)">Muscles: ${t.muscles.join(', ')} • Est. ${estimatedCalories} cal</div>
+          ${normalizedBlocks.length ? `
+            <div class="template-blocks-preview">
+              ${normalizedBlocks.map(block => `
+                <div class="template-block-item">
+                  <div style="font-weight:700">${block.id} ${blockTypeLabel(block.type)} x${block.rounds}</div>
+                  <div class="muted" style="font-size:12px; margin-top:3px">${block.exercises.map((ex, i) => `${block.id}${i + 1} ${ex.name}`).join(' • ')}</div>
+                </div>
+              `).join("")}
+            </div>
+          ` : ``}
           <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow:auto; padding-right:8px">
-            ${t.exercises.map(ex => `
+            ${previewExercises.map(ex => `
               <div style="display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2)">
                 <div style="width:36px; height:36px; border-radius:8px; background:var(--card); display:grid; place-items:center; font-weight:700; color:var(--text)">${(ex.name||'')[0] || '?'}</div>
                 <div style="flex:1">
@@ -927,32 +1172,29 @@ function evaluateInlineCalc(raw){
         if(!replace) return;
       }
 
+      const normalizedBlocks = normalizeTemplateBlocks(t);
+      const sourceExercises = normalizedBlocks.length ? flattenTemplateExercisesFromBlocks(normalizedBlocks) : (t.exercises || []);
+      const exercises = sourceExercises.map(ex => {
+        const pref = getExercisePref(ex.name);
+        return {
+          name: ex.name,
+          muscle: ex.muscle,
+          exercise_link: ex.exercise_link,
+          trackingType: ex.trackingType || "weight_reps",
+          met: ex.met,
+          sets: Array.from({ length: pref.lastSets || ex.defaultSets }, () => createSetFromExercise(ex, pref, false))
+        };
+      });
+
       activeWorkout = {
         id: id(),
         templateId: t.id,
         name: t.name,
         muscles: [...t.muscles],
+        workoutType: t.workoutType || "standard",
         startTime: new Date().toISOString(),
-        exercises: t.exercises.map(ex => {
-          const pref = getExercisePref(ex.name);
-          const isTimeDistance = ex.trackingType === "time_distance";
-          return {
-            name: ex.name,
-            muscle: ex.muscle,
-            exercise_link: ex.exercise_link,
-            trackingType: ex.trackingType || "weight_reps",
-            met: ex.met,
-            sets: Array.from({ length: pref.lastSets || ex.defaultSets }, () => {
-              if(ex.name === 'Plank'){
-                return { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
-              } else if(isTimeDistance){
-                return { time: pref.lastTime || 0, distance: pref.lastDistance || 0, completed: false };
-              } else {
-                return { weight: pref.lastWeight || 0, reps: pref.lastReps || ex.defaultReps, completed: false };
-              }
-            })
-          };
-        })
+        exercises,
+        blocks: normalizedBlocks.length ? buildActiveBlocksFromTemplate(t) : null
       };
       saveActiveWorkout();
       updateResumeChip();
@@ -987,12 +1229,12 @@ function evaluateInlineCalc(raw){
 
       actions.style.display = "flex";
       startWorkoutTimer();
-      const totalSets = activeWorkout.exercises.reduce((a,e)=>a+(e.sets?.length||0),0);
+      const totalSets = countTotalSets(activeWorkout);
       const doneSets = countCompletedSets(activeWorkout);
       const estimatedCalories = calculateWorkoutCalories(activeWorkout);
 
       let html = `
-       <div class="workout-head">
+        <div class="workout-head">
          <div style="display:flex; align-items:center; gap:10px">
            <div style="font-weight:800; letter-spacing:.4px">${activeWorkout.name}</div>
            <div class="badges">
@@ -1002,15 +1244,15 @@ function evaluateInlineCalc(raw){
          <div style="display:flex; align-items:center; gap:10px">
            <div class="muted">${doneSets}/${totalSets} sets completed</div>
            <div class="muted">Est. ${estimatedCalories} cal</div>
-           <button class="btn secondary" id="editWorkoutBtn" title="Add exercises to workout">
-             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-           </button>
-         </div>
-       </div>
-        <div class="exercise-list">
-      `;
+            <button class="btn secondary" id="editWorkoutBtn" title="Add exercises to workout">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </button>
+          </div>
+        </div>
+         <div class="exercise-list">
+       `;
 
-      activeWorkout.exercises.forEach((ex, ei)=>{
+      const appendStandardExerciseCard = (ex, ei) => {
         const isTimeDistance = ex.trackingType === "time_distance";
         html += `
           <div class="exercise" data-ex="${ei}">
@@ -1059,7 +1301,89 @@ function evaluateInlineCalc(raw){
             </div>
           </div>
         `;
-      });
+      };
+
+      if(hasStructuredBlocks(activeWorkout)){
+        const groupedNames = getStructuredBlockExerciseNameSet(activeWorkout);
+        activeWorkout.blocks.forEach((block, bi) => {
+          html += `
+            <div class="exercise block-container" data-block="${bi}">
+              <div class="row">
+                <div>
+                  <div class="name">${block.id} ${blockTypeLabel(block.type)}</div>
+                  <div class="muscle">${block.roundEntries.length} rounds • Rest ${block.restSec}s</div>
+                </div>
+                <div class="block-actions">
+                  <button class="btn secondary round-action-btn" data-add-round="${bi}" aria-label="Add round">
+                    <span class="round-mobile-icon" aria-hidden="true">+</span>
+                    <span class="round-mobile-label" aria-hidden="true">Round</span>
+                    <span class="btn-text">Add Round</span>
+                  </button>
+                  <button class="btn secondary round-action-btn" data-remove-round="${bi}" aria-label="Remove round">
+                    <span class="round-mobile-icon" aria-hidden="true">−</span>
+                    <span class="round-mobile-label" aria-hidden="true">Round</span>
+                    <span class="btn-text">Remove Round</span>
+                  </button>
+                </div>
+              </div>
+              <div class="block-rounds">
+                ${(block.roundEntries || []).map((round, ri) => `
+                  <div class="block-round" data-block="${bi}" data-round="${ri}">
+                    <div class="block-round-head">
+                      <div class="block-round-title">${block.id}${ri + 1}</div>
+                      <div class="block-round-subtitle">${(round.exercises || []).length} exercises</div>
+                    </div>
+                    <div class="block-round-grid">
+                      ${(round.exercises || []).map((ex, ei) => `
+                        <div class="block-exercise exercise-like">
+                          <div class="row">
+                            <div>
+                              <div style="display:flex; align-items:center; gap:8px">
+                                <button class="exercise-link-btn" data-block="${bi}" data-round="${ri}" data-bex="${ei}" data-link="${ex.exercise_link || '#'}" title="View Exercise Demo">
+                                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                                </button>
+                                <div>
+                                  <div class="name exercise-name-btn" data-block="${bi}" data-round="${ri}" data-bex="${ei}">${ex.name}</div>
+                                  <div class="muscle">${ex.muscle}</div>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="block-link-chip">E${ei + 1}</div>
+                          </div>
+                          <div class="set-list">
+                            ${(ex.sets || []).map((s, si) => `
+                              <div class="set" data-block="${bi}" data-round="${ri}" data-bex="${ei}" data-set="${si}">
+                                <div class="index set-index-btn">${block.type === "drop_set" ? (si === 0 ? "T" : `D${si}`) : "1"}</div>
+                                ${ex.name === 'Plank' ? `
+                                  <input type="text" inputmode="decimal" placeholder="Weight (kg)" value="${s.weight ?? ''}" data-weight />
+                                  <input type="text" inputmode="numeric" placeholder="Time (sec)" value="${s.time ?? ''}" data-time />
+                                ` : ex.trackingType === "time_distance" ? `
+                                  <input type="text" inputmode="decimal" placeholder="Time (min)" value="${s.time ?? ''}" data-time />
+                                  <input type="text" inputmode="decimal" placeholder="Distance (km)" value="${s.distance ?? ''}" data-distance />
+                                ` : `
+                                  <input type="text" inputmode="decimal" placeholder="${getDropSetWeightPlaceholder(block, ex, si)}" value="${s.weight ?? ''}" data-weight />
+                                  <input type="text" inputmode="numeric" placeholder="Reps" value="${s.reps ?? ''}" data-reps />
+                                `}
+                                <div class="complete ${s.completed?'checked':''}" data-complete title="Mark set complete">${s.completed ? '&#10003;' : ''}</div>
+                              </div>
+                            `).join("")}
+                          </div>
+                        </div>
+                      `).join("")}
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          `;
+        });
+        activeWorkout.exercises.forEach((ex, ei) => {
+          if(groupedNames.has(String(ex?.name || "").toLowerCase())) return;
+          appendStandardExerciseCard(ex, ei);
+        });
+      } else {
+        activeWorkout.exercises.forEach((ex, ei)=> appendStandardExerciseCard(ex, ei));
+      }
 
       html += `</div>`;
       wrap.innerHTML = html;
@@ -1073,11 +1397,18 @@ function evaluateInlineCalc(raw){
           if (link && link !== '#') {
             window.open(link, '_blank');
           } else {
-            // Google the exercise name
-            const exerciseEl = this.closest('.exercise');
-            const ei = Number(exerciseEl.getAttribute('data-ex'));
-            const ex = activeWorkout.exercises[ei];
-            const query = encodeURIComponent(ex.name + ' exercise');
+            let exName = '';
+            if(this.hasAttribute("data-block")){
+              const bi = Number(this.getAttribute("data-block"));
+              const ri = Number(this.getAttribute("data-round"));
+              const bei = Number(this.getAttribute("data-bex"));
+              exName = activeWorkout?.blocks?.[bi]?.roundEntries?.[ri]?.exercises?.[bei]?.name || '';
+            } else {
+              const exerciseEl = this.closest('.exercise');
+              const ei = Number(exerciseEl?.getAttribute('data-ex'));
+              exName = activeWorkout?.exercises?.[ei]?.name || '';
+            }
+            const query = encodeURIComponent((exName || 'exercise') + ' exercise');
             window.open(`https://www.google.com/search?q=${query}`, '_blank');
           }
         });
@@ -1087,6 +1418,18 @@ function evaluateInlineCalc(raw){
         btn.addEventListener("click", e=>{
           const ei = Number(btn.getAttribute("data-add-set"));
           addSet(ei);
+        });
+      });
+      wrap.querySelectorAll("[data-add-round]").forEach(btn=>{
+        btn.addEventListener("click", () => {
+          const bi = Number(btn.getAttribute("data-add-round"));
+          addBlockRound(bi);
+        });
+      });
+      wrap.querySelectorAll("[data-remove-round]").forEach(btn=>{
+        btn.addEventListener("click", () => {
+          const bi = Number(btn.getAttribute("data-remove-round"));
+          removeBlockRound(bi);
         });
       });
       wrap.querySelectorAll("[data-complete-all]").forEach(btn=>{
@@ -1106,8 +1449,10 @@ function evaluateInlineCalc(raw){
         btn.addEventListener('click', function(e) {
           e.preventDefault();
           e.stopPropagation();
+          if(this.hasAttribute("data-block")) return;
           const ei = Number(this.getAttribute('data-ei'));
           const si = Number(this.getAttribute('data-si'));
+          if(!Number.isFinite(ei) || !Number.isFinite(si)) return;
           handleSetIndexClick(ei, si, this);
         });
       });
@@ -1117,7 +1462,17 @@ function evaluateInlineCalc(raw){
         btn.addEventListener('click', function(e) {
           e.preventDefault();
           e.stopPropagation();
-          selectedExerciseIndex = Number(this.getAttribute('data-ex'));
+          if(this.hasAttribute("data-block")){
+            selectedExerciseIndex = null;
+            selectedStructuredExerciseRef = {
+              bi: Number(this.getAttribute("data-block")),
+              ri: Number(this.getAttribute("data-round")),
+              ei: Number(this.getAttribute("data-bex"))
+            };
+          } else {
+            selectedStructuredExerciseRef = null;
+            selectedExerciseIndex = Number(this.getAttribute('data-ex'));
+          }
           document.getElementById('exerciseOptionsModal').style.display = 'flex';
         });
       });
@@ -1136,8 +1491,6 @@ function evaluateInlineCalc(raw){
       const target = e.target;
       const setEl = target.closest(".set");
       if(!setEl) return;
-      const ei = Number(setEl.getAttribute("data-ex"));
-      const si = Number(setEl.getAttribute("data-set"));
       if(!activeWorkout) return;
     
       const raw = String(target.value ?? '');
@@ -1168,8 +1521,22 @@ function evaluateInlineCalc(raw){
         target.value = String(val);
       }
     
-      const ex = activeWorkout.exercises[ei];
-      const s  = ex.sets[si];
+      let ex;
+      let s;
+      if(setEl.hasAttribute("data-block")){
+        const bi = Number(setEl.getAttribute("data-block"));
+        const ri = Number(setEl.getAttribute("data-round"));
+        const ei = Number(setEl.getAttribute("data-bex"));
+        const si = Number(setEl.getAttribute("data-set"));
+        ex = activeWorkout.blocks?.[bi]?.roundEntries?.[ri]?.exercises?.[ei];
+        s = ex?.sets?.[si];
+      } else {
+        const ei = Number(setEl.getAttribute("data-ex"));
+        const si = Number(setEl.getAttribute("data-set"));
+        ex = activeWorkout.exercises?.[ei];
+        s = ex?.sets?.[si];
+      }
+      if(!s) return;
       if(target.hasAttribute("data-weight"))   s.weight   = val;
       if(target.hasAttribute("data-reps"))     s.reps     = val;
       if(target.hasAttribute("data-time"))     s.time     = val;
@@ -1182,22 +1549,70 @@ function evaluateInlineCalc(raw){
       const btn = e.target.closest("[data-remove],[data-complete]");
       if(!btn) return;
       const setEl = e.target.closest(".set");
+      if(!setEl) return;
+
+      if(setEl.hasAttribute("data-block")){
+        const bi = Number(setEl.getAttribute("data-block"));
+        const ri = Number(setEl.getAttribute("data-round"));
+        const ei = Number(setEl.getAttribute("data-bex"));
+        const si = Number(setEl.getAttribute("data-set"));
+        if(btn.hasAttribute("data-complete")) toggleBlockSetComplete(bi, ri, ei, si, btn);
+        return;
+      }
+
       const ei = Number(setEl.getAttribute("data-ex"));
       const si = Number(setEl.getAttribute("data-set"));
-
       if(btn.hasAttribute("data-remove")) removeSet(ei, si);
       if(btn.hasAttribute("data-complete")) toggleSetComplete(ei, si, btn);
     }
     function updateWorkoutProgressBar(){
       const content = document.getElementById("workoutContent");
       if(!activeWorkout || !content) return;
-      const total = activeWorkout.exercises.reduce((a,e)=>a+(e.sets?.length||0),0);
+      const total = countTotalSets(activeWorkout);
       const done = countCompletedSets(activeWorkout);
       const head = content.querySelector(".workout-head .muted");
       if(head) head.textContent = `${done}/${total} sets completed`;
       const finishBtn = document.getElementById("finishWorkoutBtn");
-      if(finishBtn) finishBtn.disabled = done === 0;
+      if(finishBtn) finishBtn.disabled = done < total;
       saveActiveWorkout();
+    }
+
+    function addBlockRound(bi){
+      if(!activeWorkout?.blocks?.[bi]) return;
+      const block = activeWorkout.blocks[bi];
+      const round = {
+        exercises: block.exercises.map(ex => {
+          const pref = getExercisePref(ex.name);
+          const topSet = createSetFromExercise(ex, pref, false);
+          if(block.type !== "drop_set") return { ...ex, sets: [topSet] };
+          const drops = [];
+          const dropCount = block.dropConfig?.drops || 2;
+          const dropPercent = block.dropConfig?.dropPercent || 20;
+          for(let di = 1; di <= dropCount; di++){
+            const dropSet = createSetFromExercise(ex, pref, false);
+            dropSet.dropIndex = di;
+            dropSet.dropPercent = dropPercent;
+            drops.push(dropSet);
+          }
+          topSet.dropIndex = 0;
+          topSet.dropPercent = 0;
+          return { ...ex, sets: [topSet, ...drops] };
+        })
+      };
+      block.roundEntries.push(round);
+      block.rounds = block.roundEntries.length;
+      saveActiveWorkout();
+      renderWorkout();
+    }
+
+    function removeBlockRound(bi){
+      if(!activeWorkout?.blocks?.[bi]) return;
+      const block = activeWorkout.blocks[bi];
+      if((block.roundEntries || []).length <= 1) return;
+      block.roundEntries.pop();
+      block.rounds = block.roundEntries.length;
+      saveActiveWorkout();
+      renderWorkout();
     }
 
     function addSet(ei){
@@ -1205,16 +1620,7 @@ function evaluateInlineCalc(raw){
       const ex = activeWorkout.exercises[ei];
       if(!ex.sets) ex.sets = [];
       const pref = getExercisePref(ex.name);
-      const isTimeDistance = ex.trackingType === "time_distance";
-      let newSet;
-      if(ex.name === 'Plank'){
-        newSet = { weight: pref.lastWeight || 0, time: pref.lastTime || 0, completed: false };
-      } else if(isTimeDistance){
-        newSet = { time: pref.lastTime || 0, distance: pref.lastDistance || 0, completed: false };
-      } else {
-        newSet = { weight: pref.lastWeight || 0, reps: pref.lastReps || 0, completed: false };
-      }
-      ex.sets.push(newSet);
+      ex.sets.push(createSetFromExercise(ex, pref, false));
       saveActiveWorkout();
       renderWorkout();
     }
@@ -1227,6 +1633,7 @@ function evaluateInlineCalc(raw){
     }
     function toggleSetComplete(ei, si, btnEl){
       const s = activeWorkout.exercises[ei].sets[si];
+      if(!s) return;
       s.completed = !s.completed;
       saveActiveWorkout();
       btnEl.classList.toggle("checked", s.completed);
@@ -1242,6 +1649,17 @@ function evaluateInlineCalc(raw){
       if(s.completed && loadAutoRest()){
         startBreakTimer();
       }
+    }
+    function toggleBlockSetComplete(bi, ri, ei, si, btnEl){
+      const s = activeWorkout?.blocks?.[bi]?.roundEntries?.[ri]?.exercises?.[ei]?.sets?.[si];
+      if(!s) return;
+      s.completed = !s.completed;
+      saveActiveWorkout();
+      btnEl.classList.toggle("checked", s.completed);
+      btnEl.innerHTML = s.completed ? "&#10003;" : "";
+      updateWorkoutProgressBar();
+      if(s.completed) playSound('set_complete.mp3');
+      if(s.completed && loadAutoRest()) startBreakTimer();
     }
     function completeAllSets(ei){
       const ex = activeWorkout.exercises[ei];
@@ -1290,9 +1708,100 @@ function evaluateInlineCalc(raw){
       showToast("Workout discarded", "warn");
     }
 
+    function buildRecordExercisesFromWorkout(workout){
+      if(hasStructuredBlocks(workout)){
+        const groupedNames = getStructuredBlockExerciseNameSet(workout);
+        const byName = new Map();
+        workout.blocks.forEach(block => {
+          (block.roundEntries || []).forEach(round => {
+            (round.exercises || []).forEach(ex => {
+              const key = ex.name.toLowerCase();
+              if(!byName.has(key)){
+                byName.set(key, { name: ex.name, muscle: ex.muscle, met: ex.met, trackingType: ex.trackingType, sets: [] });
+              }
+              const target = byName.get(key);
+              (ex.sets || []).forEach(s => {
+                if(s.reps || s.weight || s.time || s.distance || s.completed){
+                  const out = { completed: !!s.completed };
+                  if("weight" in s) out.weight = Number(s.weight || 0);
+                  if("reps" in s) out.reps = Number(s.reps || 0);
+                  if("time" in s) out.time = Number(s.time || 0);
+                  if("distance" in s) out.distance = Number(s.distance || 0);
+                  if("dropIndex" in s) out.dropIndex = Number(s.dropIndex || 0);
+                  target.sets.push(out);
+                }
+              });
+            });
+          });
+        });
+        (workout.exercises || []).forEach(ex => {
+          if(groupedNames.has(String(ex?.name || "").toLowerCase())) return;
+          const key = ex.name.toLowerCase();
+          if(!byName.has(key)){
+            byName.set(key, { name: ex.name, muscle: ex.muscle, met: ex.met, trackingType: ex.trackingType, sets: [] });
+          }
+          const target = byName.get(key);
+          (ex.sets || []).forEach(s => {
+            if(s.reps || s.weight || s.time || s.distance || s.completed){
+              const out = { completed: !!s.completed };
+              if("weight" in s) out.weight = Number(s.weight || 0);
+              if("reps" in s) out.reps = Number(s.reps || 0);
+              if("time" in s) out.time = Number(s.time || 0);
+              if("distance" in s) out.distance = Number(s.distance || 0);
+              target.sets.push(out);
+            }
+          });
+        });
+        return Array.from(byName.values());
+      }
+      return (workout.exercises || []).map(ex => ({
+        name: ex.name,
+        muscle: ex.muscle,
+        met: ex.met,
+        trackingType: ex.trackingType,
+        sets: (ex.sets || []).filter(s => s.reps || s.weight || s.time || s.distance || s.completed).map(s => {
+          if(ex.name === 'Plank'){
+            return { weight: Number(s.weight || 0), time: Number(s.time || 0), completed: !!s.completed };
+          }
+          if(ex.trackingType === "time_distance"){
+            return { time: Number(s.time || 0), distance: Number(s.distance || 0), completed: !!s.completed };
+          }
+          return { weight: Number(s.weight || 0), reps: Number(s.reps || 0), completed: !!s.completed };
+        })
+      }));
+    }
+
+    function buildRecordBlocksFromWorkout(workout){
+      if(!hasStructuredBlocks(workout)) return null;
+      return workout.blocks.map(block => ({
+        id: block.id,
+        type: block.type,
+        rounds: block.roundEntries?.length || block.rounds || 0,
+        restSec: block.restSec,
+        dropConfig: block.dropConfig || null,
+        roundEntries: (block.roundEntries || []).map(round => ({
+          exercises: (round.exercises || []).map(ex => ({
+            name: ex.name,
+            muscle: ex.muscle,
+            met: ex.met,
+            trackingType: ex.trackingType,
+            sets: (ex.sets || []).map(s => ({
+              weight: Number(s.weight || 0),
+              reps: Number(s.reps || 0),
+              time: Number(s.time || 0),
+              distance: Number(s.distance || 0),
+              completed: !!s.completed,
+              dropIndex: Number(s.dropIndex || 0),
+              dropPercent: Number(s.dropPercent || 0)
+            }))
+          }))
+        }))
+      }));
+    }
+
     function finishWorkout(){
       if(!activeWorkout) return;
-      const totalSets = activeWorkout.exercises.reduce((a,e)=>a+(e.sets?.length||0),0);
+      const totalSets = countTotalSets(activeWorkout);
       const totalDone = countCompletedSets(activeWorkout);
       if(totalDone < totalSets){
         // Show warning modal
@@ -1308,42 +1817,20 @@ function evaluateInlineCalc(raw){
       const endTime = new Date().toISOString();
       // Build compact summary to store
       const calories = calculateWorkoutCalories(activeWorkout);
+      const recordExercises = buildRecordExercisesFromWorkout(activeWorkout);
+      const recordBlocks = buildRecordBlocksFromWorkout(activeWorkout);
       const record = {
         id: activeWorkout.id,
         templateId: activeWorkout.templateId,
         name: activeWorkout.name,
+        workoutType: activeWorkout.workoutType || "standard",
         dateKey: todayKey(),
         startTime: activeWorkout.startTime,
         endTime,
         minutes: minutesBetween(activeWorkout.startTime, endTime),
         calories,
-        exercises: activeWorkout.exercises.map(ex => ({
-          name: ex.name,
-          muscle: ex.muscle,
-          met: ex.met,
-          sets: ex.sets.filter(s => s.reps || s.weight || s.time || s.distance || s.completed).map(s => {
-            const isTimeDistance = ex.trackingType === "time_distance";
-            if(ex.name === 'Plank'){
-              return {
-                weight: Number(s.weight || 0),
-                time: Number(s.time || 0),
-                completed: !!s.completed
-              };
-            } else if(isTimeDistance){
-              return {
-                time: Number(s.time || 0),
-                distance: Number(s.distance || 0),
-                completed: !!s.completed
-              };
-            } else {
-              return {
-                weight: Number(s.weight || 0),
-                reps: Number(s.reps || 0),
-                completed: !!s.completed
-              };
-            }
-          })
-        }))
+        exercises: recordExercises,
+        blocks: recordBlocks
       };
       history.push(record);
       saveHistory();
@@ -1352,7 +1839,7 @@ function evaluateInlineCalc(raw){
       generateWorkoutSummary(record.id);
 
       // Update exercise preferences
-      activeWorkout.exercises.forEach(ex => {
+      recordExercises.forEach(ex => {
         const completedSets = ex.sets.filter(s => s.completed);
         if(completedSets.length > 0){
           const lastSet = completedSets[completedSets.length - 1];
@@ -2092,13 +2579,40 @@ function evaluateInlineCalc(raw){
 
     function removeIncompleteSets(){
       if(!activeWorkout) return;
-      activeWorkout.exercises.forEach(ex => {
-        if(ex.sets){
-          ex.sets = ex.sets.filter(s => s.completed);
-        }
-      });
+      if(hasStructuredBlocks(activeWorkout)){
+        const groupedNames = getStructuredBlockExerciseNameSet(activeWorkout);
+        activeWorkout.blocks.forEach(block => {
+          (block.roundEntries || []).forEach(round => {
+            (round.exercises || []).forEach(ex => {
+              if(ex.sets) ex.sets = ex.sets.filter(s => s.completed);
+            });
+          });
+        });
+        activeWorkout.exercises.forEach(ex => {
+          if(groupedNames.has(String(ex?.name || "").toLowerCase())) return;
+          if(ex.sets) ex.sets = ex.sets.filter(s => s.completed);
+        });
+      } else {
+        activeWorkout.exercises.forEach(ex => {
+          if(ex.sets) ex.sets = ex.sets.filter(s => s.completed);
+        });
+      }
       saveActiveWorkout();
       renderWorkout();
+    }
+
+    function getSelectedExerciseFromOptions(){
+      if(!activeWorkout) return null;
+      if(selectedStructuredExerciseRef){
+        const { bi, ri, ei } = selectedStructuredExerciseRef;
+        const ex = activeWorkout?.blocks?.[bi]?.roundEntries?.[ri]?.exercises?.[ei];
+        if(!ex) return null;
+        return { ex, mode: "block", bi, ri, ei };
+      }
+      if(selectedExerciseIndex === null) return null;
+      const ex = activeWorkout?.exercises?.[selectedExerciseIndex];
+      if(!ex) return null;
+      return { ex, mode: "standard", exerciseIndex: selectedExerciseIndex };
     }
 
     // Generate custom workout
@@ -2139,6 +2653,7 @@ Output in JSON format with the following structure:
 {
   "id": "unique-id",
   "name": "Workout Name",
+  "workoutType": "standard",
   "muscles": ["Muscle1", "Muscle2"],
   "exercises": [
     {
@@ -2166,6 +2681,7 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
               properties: {
                 id: { type: 'string' },
                 name: { type: 'string' },
+                workoutType: { type: 'string' },
                 muscles: { type: 'array', items: { type: 'string' } },
                 exercises: {
                   type: 'array',
@@ -2191,6 +2707,12 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
         document.getElementById('statusText').textContent = 'AI is generating workout...';
 
         const workout = JSON.parse(response.candidates[0].content.parts[0].text);
+        const allowedWorkoutTypes = new Set(["standard", "superset", "compound_set", "tri_set", "drop_set"]);
+        if(!allowedWorkoutTypes.has(String(workout.workoutType || "").toLowerCase())){
+          workout.workoutType = "standard";
+        } else {
+          workout.workoutType = String(workout.workoutType).toLowerCase();
+        }
 
         document.getElementById('statusText').textContent = 'Parsing workout data...';
 
@@ -2744,8 +3266,9 @@ Keep everything minimal and actionable.`;
 
       // Exercise options modal
       document.getElementById('previewExerciseBtn').addEventListener('click', () => {
-        if (selectedExerciseIndex !== null && activeWorkout) {
-          const ex = activeWorkout.exercises[selectedExerciseIndex];
+        const selected = getSelectedExerciseFromOptions();
+        if (selected && activeWorkout) {
+          const ex = selected.ex;
           if (ex.exercise_link && ex.exercise_link !== '#') {
             window.open(ex.exercise_link, '_blank');
           } else {
@@ -2757,23 +3280,46 @@ Keep everything minimal and actionable.`;
       });
 
       document.getElementById('removeExerciseBtn').addEventListener('click', () => {
-        if (selectedExerciseIndex !== null && activeWorkout) {
-          activeWorkout.exercises.splice(selectedExerciseIndex, 1);
+        const selected = getSelectedExerciseFromOptions();
+        if (selected && activeWorkout) {
+          if(selected.mode === "block"){
+            const nameToRemove = selected.ex.name;
+            activeWorkout.blocks.forEach(block => {
+              block.exercises = (block.exercises || []).filter(ex => ex.name !== nameToRemove);
+              (block.roundEntries || []).forEach(round => {
+                round.exercises = (round.exercises || []).filter(ex => ex.name !== nameToRemove);
+              });
+            });
+            activeWorkout.exercises = (activeWorkout.exercises || []).filter(ex => ex.name !== nameToRemove);
+            selectedStructuredExerciseRef = null;
+            showToast('Exercise removed from block workout');
+          } else {
+            activeWorkout.exercises.splice(selected.exerciseIndex, 1);
+            selectedExerciseIndex = null;
+            showToast('Exercise removed from workout');
+          }
           saveActiveWorkout();
           renderWorkout();
-          showToast('Exercise removed from workout');
         }
         document.getElementById('exerciseOptionsModal').style.display = 'none';
       });
 
       document.getElementById('replaceExerciseBtn').addEventListener('click', () => {
-        if (selectedExerciseIndex !== null && activeWorkout) {
-          openReplaceExerciseSelector(selectedExerciseIndex);
+        const selected = getSelectedExerciseFromOptions();
+        if (selected && activeWorkout) {
+          if(selected.mode === "block"){
+            showToast('Use Add Exercises and then remove old one for block workouts', 'warn');
+            document.getElementById('exerciseOptionsModal').style.display = 'none';
+            return;
+          }
+          openReplaceExerciseSelector(selected.exerciseIndex);
         }
         document.getElementById('exerciseOptionsModal').style.display = 'none';
       });
 
       document.getElementById('cancelExerciseOptionsBtn').addEventListener('click', () => {
+        selectedExerciseIndex = null;
+        selectedStructuredExerciseRef = null;
         document.getElementById('exerciseOptionsModal').style.display = 'none';
       });
 

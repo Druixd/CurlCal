@@ -197,10 +197,10 @@
       <div id="apiKeyMessage" style="display:none; color: var(--warning); font-size:12px; margin-bottom:8px">
         Please set your Gemini API key. Get one from <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent)">Google AI Studio</a>.
       </div>
-      <div style="margin-bottom:12px">
+      <form style="margin-bottom:12px" onsubmit="return false" autocomplete="on">
         <label for="apiKeyInput" style="display:block; margin-bottom:4px; font-size:13px">Gemini API Key:</label>
-        <input type="password" id="apiKeyInput" class="input-field" placeholder="Enter your API key" style="font-size:13px">
-      </div>
+        <input type="password" id="apiKeyInput" class="input-field" placeholder="Enter your API key" style="font-size:13px" autocomplete="current-password">
+      </form>
       <div style="margin-bottom:12px">
         <label for="breakDurationSelect" style="display:block; margin-bottom:4px; font-size:13px">Break Duration (sec):</label>
         <select id="breakDurationSelect" class="input-field" style="font-size:13px">

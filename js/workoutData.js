@@ -655,6 +655,255 @@ const WORKOUT_TEMPLATES = [
       { name:"Plank", muscle:"Core", defaultSets:3, defaultReps:60, exercise_link:"https://musclewiki.com/exercise/plank", met:4 }
     ]
   },
+  // ===== STRUCTURED WORKOUT TYPES (Source-backed) =====
+  // Sources used:
+  // - https://musclewiki.com/
+  // - https://exrx.net/Lists/Directory
+  // - https://darebee.com/workout.html
+  // - Nike Training Club app/programming patterns
+  {
+    id: "push-superset-blast",
+    name: "Push Superset Blast",
+    workoutType: "superset",
+    source_ref: "musclewiki+ntc",
+    muscles: ["Chest", "Shoulders", "Arms"],
+    exercises: [
+      { name:"Barbell Bench Press", muscle:"Chest", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-bench-press", met:6 },
+      { name:"Push-ups", muscle:"Chest", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/push-up", met:7 },
+      { name:"Overhead Press", muscle:"Shoulders", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/dumbbell-overhead-press", met:5 },
+      { name:"Lateral Raises", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"superset", rounds:3, restSec:75, exercises:[
+        { name:"Barbell Bench Press", muscle:"Chest", defaultSets:1, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-bench-press", met:6 },
+        { name:"Push-ups", muscle:"Chest", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/push-up", met:7 }
+      ]},
+      { id:"B", type:"superset", rounds:3, restSec:75, exercises:[
+        { name:"Overhead Press", muscle:"Shoulders", defaultSets:1, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/dumbbell-overhead-press", met:5 },
+        { name:"Lateral Raises", muscle:"Shoulders", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise", met:4 }
+      ]}
+    ]
+  },
+  {
+    id: "pull-superset-builder",
+    name: "Pull Superset Builder",
+    workoutType: "superset",
+    source_ref: "musclewiki+exrx",
+    muscles: ["Back", "Arms"],
+    exercises: [
+      { name:"Lat Pulldown", muscle:"Back", defaultSets:3, defaultReps:10, exercise_link:"", met:5 },
+      { name:"Seated Cable Row", muscle:"Back", defaultSets:3, defaultReps:10, exercise_link:"", met:5 },
+      { name:"Barbell Curl", muscle:"Arms", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/barbell-curl", met:4 },
+      { name:"Hammer Curls", muscle:"Arms", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-hammer-curl", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"superset", rounds:3, restSec:75, exercises:[
+        { name:"Lat Pulldown", muscle:"Back", defaultSets:1, defaultReps:10, exercise_link:"", met:5 },
+        { name:"Seated Cable Row", muscle:"Back", defaultSets:1, defaultReps:10, exercise_link:"", met:5 }
+      ]},
+      { id:"B", type:"superset", rounds:3, restSec:60, exercises:[
+        { name:"Barbell Curl", muscle:"Arms", defaultSets:1, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/barbell-curl", met:4 },
+        { name:"Hammer Curls", muscle:"Arms", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-hammer-curl", met:4 }
+      ]}
+    ]
+  },
+  {
+    id: "leg-superset-density",
+    name: "Leg Superset Density",
+    workoutType: "superset",
+    source_ref: "darebee+exrx",
+    muscles: ["Legs", "Core"],
+    exercises: [
+      { name:"Goblet Squat", muscle:"Legs", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-goblet-squat", met:5 },
+      { name:"Walking Lunges", muscle:"Legs", defaultSets:3, defaultReps:12, exercise_link:"", met:5 },
+      { name:"Romanian Deadlift", muscle:"Legs", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/barbell-romanian-deadlift", met:5 },
+      { name:"Calf Raises", muscle:"Legs", defaultSets:3, defaultReps:15, exercise_link:"", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"superset", rounds:3, restSec:90, exercises:[
+        { name:"Goblet Squat", muscle:"Legs", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-goblet-squat", met:5 },
+        { name:"Walking Lunges", muscle:"Legs", defaultSets:1, defaultReps:12, exercise_link:"", met:5 }
+      ]},
+      { id:"B", type:"superset", rounds:3, restSec:90, exercises:[
+        { name:"Romanian Deadlift", muscle:"Legs", defaultSets:1, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/barbell-romanian-deadlift", met:5 },
+        { name:"Calf Raises", muscle:"Legs", defaultSets:1, defaultReps:15, exercise_link:"", met:4 }
+      ]}
+    ]
+  },
+  {
+    id: "chest-compound-fatigue",
+    name: "Chest Compound Fatigue",
+    workoutType: "compound_set",
+    source_ref: "exrx+ntc",
+    muscles: ["Chest"],
+    exercises: [
+      { name:"Barbell Bench Press", muscle:"Chest", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-bench-press", met:6 },
+      { name:"Incline Dumbbell Press", muscle:"Chest", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-incline-bench-press", met:6 },
+      { name:"Cable Flyes", muscle:"Chest", defaultSets:3, defaultReps:12, exercise_link:"", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"compound_set", rounds:3, restSec:90, exercises:[
+        { name:"Barbell Bench Press", muscle:"Chest", defaultSets:1, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-bench-press", met:6 },
+        { name:"Incline Dumbbell Press", muscle:"Chest", defaultSets:1, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-incline-bench-press", met:6 }
+      ]},
+      { id:"B", type:"compound_set", rounds:3, restSec:75, exercises:[
+        { name:"Cable Flyes", muscle:"Chest", defaultSets:1, defaultReps:12, exercise_link:"", met:4 },
+        { name:"Push-ups", muscle:"Chest", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/push-up", met:7 }
+      ]}
+    ]
+  },
+  {
+    id: "shoulder-compound-burn",
+    name: "Shoulder Compound Burn",
+    workoutType: "compound_set",
+    source_ref: "exrx+musclewiki",
+    muscles: ["Shoulders"],
+    exercises: [
+      { name:"Overhead Press", muscle:"Shoulders", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/dumbbell-overhead-press", met:5 },
+      { name:"Arnold Press", muscle:"Shoulders", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-arnold-press", met:5 },
+      { name:"Lateral Raises", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"compound_set", rounds:3, restSec:75, exercises:[
+        { name:"Overhead Press", muscle:"Shoulders", defaultSets:1, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/dumbbell-overhead-press", met:5 },
+        { name:"Arnold Press", muscle:"Shoulders", defaultSets:1, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-arnold-press", met:5 }
+      ]},
+      { id:"B", type:"compound_set", rounds:3, restSec:60, exercises:[
+        { name:"Lateral Raises", muscle:"Shoulders", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise", met:4 },
+        { name:"Front Raises", muscle:"Shoulders", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-front-raise", met:4 }
+      ]}
+    ]
+  },
+  {
+    id: "hamstring-compound-chain",
+    name: "Hamstring Compound Chain",
+    workoutType: "compound_set",
+    source_ref: "exrx+darebee",
+    muscles: ["Legs"],
+    exercises: [
+      { name:"Romanian Deadlift", muscle:"Legs", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-romanian-deadlift", met:5 },
+      { name:"Leg Curl", muscle:"Legs", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/machine-seated-leg-curl", met:4 },
+      { name:"Glute Bridges", muscle:"Legs", defaultSets:3, defaultReps:15, exercise_link:"https://musclewiki.com/exercise/glute-bridge", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"compound_set", rounds:3, restSec:90, exercises:[
+        { name:"Romanian Deadlift", muscle:"Legs", defaultSets:1, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-romanian-deadlift", met:5 },
+        { name:"Leg Curl", muscle:"Legs", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/machine-seated-leg-curl", met:4 }
+      ]},
+      { id:"B", type:"compound_set", rounds:3, restSec:75, exercises:[
+        { name:"Glute Bridges", muscle:"Legs", defaultSets:1, defaultReps:15, exercise_link:"https://musclewiki.com/exercise/glute-bridge", met:4 },
+        { name:"Walking Lunges", muscle:"Legs", defaultSets:1, defaultReps:12, exercise_link:"", met:5 }
+      ]}
+    ]
+  },
+  {
+    id: "delt-tri-set-circuit",
+    name: "Delt Tri-Set Circuit",
+    workoutType: "tri_set",
+    source_ref: "exrx+musclewiki",
+    muscles: ["Shoulders"],
+    exercises: [
+      { name:"Lateral Raises", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise", met:4 },
+      { name:"Front Raises", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-front-raise", met:4 },
+      { name:"Rear Delt Flyes", muscle:"Shoulders", defaultSets:3, defaultReps:12, exercise_link:"", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"tri_set", rounds:3, restSec:75, exercises:[
+        { name:"Lateral Raises", muscle:"Shoulders", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-lateral-raise", met:4 },
+        { name:"Front Raises", muscle:"Shoulders", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-front-raise", met:4 },
+        { name:"Rear Delt Flyes", muscle:"Shoulders", defaultSets:1, defaultReps:12, exercise_link:"", met:4 }
+      ]}
+    ]
+  },
+  {
+    id: "arms-tri-set-pump",
+    name: "Arms Tri-Set Pump",
+    workoutType: "tri_set",
+    source_ref: "darebee+ntc",
+    muscles: ["Arms"],
+    exercises: [
+      { name:"Barbell Curl", muscle:"Arms", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/barbell-curl", met:4 },
+      { name:"Tricep Pushdowns", muscle:"Arms", defaultSets:3, defaultReps:12, exercise_link:"", met:4 },
+      { name:"Hammer Curls", muscle:"Arms", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-hammer-curl", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"tri_set", rounds:3, restSec:60, exercises:[
+        { name:"Barbell Curl", muscle:"Arms", defaultSets:1, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/barbell-curl", met:4 },
+        { name:"Tricep Pushdowns", muscle:"Arms", defaultSets:1, defaultReps:12, exercise_link:"", met:4 },
+        { name:"Hammer Curls", muscle:"Arms", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-hammer-curl", met:4 }
+      ]}
+    ]
+  },
+  {
+    id: "quad-glute-tri-set",
+    name: "Quad/Glute Tri-Set",
+    workoutType: "tri_set",
+    source_ref: "darebee+exrx",
+    muscles: ["Legs"],
+    exercises: [
+      { name:"Back Squat", muscle:"Legs", defaultSets:3, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-squat", met:5 },
+      { name:"Bulgarian Split Squat", muscle:"Legs", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-bulgarian-split-squat", met:5 },
+      { name:"Glute Bridges", muscle:"Legs", defaultSets:3, defaultReps:15, exercise_link:"https://musclewiki.com/exercise/glute-bridge", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"tri_set", rounds:3, restSec:90, exercises:[
+        { name:"Back Squat", muscle:"Legs", defaultSets:1, defaultReps:8, exercise_link:"https://musclewiki.com/exercise/barbell-squat", met:5 },
+        { name:"Bulgarian Split Squat", muscle:"Legs", defaultSets:1, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/dumbbell-bulgarian-split-squat", met:5 },
+        { name:"Glute Bridges", muscle:"Legs", defaultSets:1, defaultReps:15, exercise_link:"https://musclewiki.com/exercise/glute-bridge", met:4 }
+      ]}
+    ]
+  },
+  {
+    id: "chest-machine-drop-ladder",
+    name: "Chest Machine Drop Ladder",
+    workoutType: "drop_set",
+    source_ref: "exrx+ntc",
+    muscles: ["Chest"],
+    exercises: [
+      { name:"Machine Chest Press", muscle:"Chest", defaultSets:3, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/machine-chest-press", met:5 },
+      { name:"Pec Deck Machine", muscle:"Chest", defaultSets:3, defaultReps:12, exercise_link:"", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"drop_set", rounds:3, restSec:75, dropConfig:{ drops:2, dropPercent:20 }, exercises:[
+        { name:"Machine Chest Press", muscle:"Chest", defaultSets:1, defaultReps:10, exercise_link:"https://musclewiki.com/exercise/machine-chest-press", met:5 },
+        { name:"Pec Deck Machine", muscle:"Chest", defaultSets:1, defaultReps:12, exercise_link:"", met:4 }
+      ]}
+    ]
+  },
+  {
+    id: "back-pulldown-drop-ladder",
+    name: "Back Pulldown Drop Ladder",
+    workoutType: "drop_set",
+    source_ref: "exrx+musclewiki",
+    muscles: ["Back"],
+    exercises: [
+      { name:"Lat Pulldown", muscle:"Back", defaultSets:3, defaultReps:10, exercise_link:"", met:5 },
+      { name:"Seated Cable Row", muscle:"Back", defaultSets:3, defaultReps:10, exercise_link:"", met:5 }
+    ],
+    blocks: [
+      { id:"A", type:"drop_set", rounds:3, restSec:75, dropConfig:{ drops:2, dropPercent:20 }, exercises:[
+        { name:"Lat Pulldown", muscle:"Back", defaultSets:1, defaultReps:10, exercise_link:"", met:5 },
+        { name:"Seated Cable Row", muscle:"Back", defaultSets:1, defaultReps:10, exercise_link:"", met:5 }
+      ]}
+    ]
+  },
+  {
+    id: "biceps-cable-drop-ladder",
+    name: "Biceps Cable Drop Ladder",
+    workoutType: "drop_set",
+    source_ref: "exrx+darebee",
+    muscles: ["Arms"],
+    exercises: [
+      { name:"Cable Curls", muscle:"Arms", defaultSets:3, defaultReps:12, exercise_link:"", met:4 },
+      { name:"Hammer Curls", muscle:"Arms", defaultSets:3, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-hammer-curl", met:4 }
+    ],
+    blocks: [
+      { id:"A", type:"drop_set", rounds:3, restSec:60, dropConfig:{ drops:2, dropPercent:20 }, exercises:[
+        { name:"Cable Curls", muscle:"Arms", defaultSets:1, defaultReps:12, exercise_link:"", met:4 },
+        { name:"Hammer Curls", muscle:"Arms", defaultSets:1, defaultReps:12, exercise_link:"https://musclewiki.com/exercise/dumbbell-hammer-curl", met:4 }
+      ]}
+    ]
+  },
 ];
 
 // Comprehensive exercise database with all possible exercises
@@ -826,3 +1075,5 @@ const COMPREHENSIVE_EXERCISES = [
  { name: "High Knees", muscle: "Cardio", defaultSets: 3, defaultReps: 30, exercise_link: "", met: 8 },
  { name: "Jump Rope", muscle: "Cardio", defaultSets: 3, defaultReps: 100, exercise_link: "https://musclewiki.com/exercise/jump-rope", met: 10, trackingType: "time_distance" }
 ];
+
+

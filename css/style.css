@@ -563,6 +563,136 @@ header.app-header {
   box-shadow: var(--shadow-sm);
 }
 
+.block-container {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+  gap: 12px;
+}
+
+.block-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.block-actions .btn.secondary {
+  height: 34px;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.round-action-btn .round-mobile-icon,
+.round-action-btn .round-mobile-label {
+  display: none;
+}
+
+.block-rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.block-round {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel-2) 60%, transparent);
+  padding: 8px;
+}
+
+.block-round-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.block-round-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 2px 8px;
+  line-height: 1.4;
+}
+
+.block-round-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.block-round-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.block-exercise {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 14px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.block-exercise .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.block-exercise .row .name {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.3px;
+  color: var(--text);
+}
+
+.block-exercise .row .muscle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.block-link-chip {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.block-exercise .set-list {
+  gap: 8px;
+}
+
+.block-exercise .set {
+  padding: 8px;
+  gap: 8px;
+}
+
+.template-blocks-preview {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-block-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--panel-2);
+  padding: 8px 10px;
+}
+
 .exercise .row {
   display: flex;
   align-items: center;
@@ -1240,7 +1370,7 @@ header.app-header {
 /* Desktop styles (1024px+) */
 @media (min-width: 1024px) {
   .container {
-    padding: 0 40px 120px;
+    padding: 0 40px 24px;
   }
 
   header.app-header {
@@ -1248,17 +1378,12 @@ header.app-header {
   }
 
   .tabs {
-    position: fixed;
-    left: 50%;
-    bottom: 20px;
-    transform: translateX(-50%);
-    z-index: 120;
-    width: min(420px, calc(100vw - 48px));
-    margin: 0;
-    background: rgba(15, 18, 25, 0.9);
-    border: 1px solid var(--border);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(10px);
+    position: static;
+    transform: none;
+    width: auto;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    z-index: auto;
   }
 
   .calendar-grid {
@@ -1269,6 +1394,10 @@ header.app-header {
   .set {
     padding: 16px;
     gap: 16px;
+  }
+
+  .block-round-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   /* Reduce AI workout generator modal width on desktop */
@@ -1348,6 +1477,73 @@ header.app-header {
   /* Hide button text on mobile, show only icons */
   .btn .btn-text {
     display: none;
+  }
+
+  /* Keep round controls readable on mobile (these buttons have no icons). */
+  .round-action-btn {
+    min-width: auto;
+    width: 46px;
+    height: 46px;
+    padding: 4px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    border-radius: 10px;
+  }
+
+  .round-action-btn .btn-text {
+    display: none !important;
+  }
+
+  .round-action-btn .round-mobile-icon {
+    display: block;
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .round-action-btn .round-mobile-label {
+    display: block;
+    font-size: 9px;
+    line-height: 1;
+    letter-spacing: 0.2px;
+    color: var(--muted);
+  }
+
+  .block-container .row {
+    align-items: flex-start;
+  }
+
+  .block-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .block-actions .btn.secondary {
+    height: 32px;
+    padding: 0 8px;
+  }
+
+  .block-round-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .block-exercise {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .block-exercise .row .name {
+    font-size: 16px;
+  }
+
+  .block-link-chip {
+    font-size: 10px;
+    padding: 2px 7px;
   }
 
   .btn svg {
