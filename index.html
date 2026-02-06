@@ -47,12 +47,20 @@
             <span class="chip" data-muscle="Core">Core</span>
             <span class="chip" data-muscle="Full Body">Full Body</span>
             <span class="chip" data-muscle="Custom">Custom</span>
+            <span class="chip" data-muscle="Favorites">Favorites</span>
           </div>
         </div>
-        <label class="search" title="Search workouts">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#94a3b8" aria-hidden="true"><path d="M21 20l-5.7-5.7a7 7 0 10-1.4 1.4L20 21l1-1zM5 10a5 5 0 1110 0 5 5 0 01-10 0z"/></svg>
-          <input id="searchInput" type="search" placeholder="Search workouts..." aria-label="Search workouts" />
-        </label>
+        <div style="display:flex; align-items:center; gap:8px; width:100%">
+          <label class="search" title="Search workouts" style="flex:1; min-width:0; width:auto; margin-left:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#94a3b8" aria-hidden="true"><path d="M21 20l-5.7-5.7a7 7 0 10-1.4 1.4L20 21l1-1zM5 10a5 5 0 1110 0 5 5 0 01-10 0z"/></svg>
+            <input id="searchInput" type="search" placeholder="Search workouts..." aria-label="Search workouts" />
+          </label>
+          <button id="favoritesOnlyBtn" class="btn secondary" type="button" aria-pressed="false" aria-label="Show only favorited workouts" title="Show only favorited workouts" style="flex-shrink:0; display:grid; place-items:center; min-width:42px; padding:10px 12px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div id="libraryGrid" class="grid" aria-live="polite"></div>
     </section>

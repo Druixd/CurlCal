@@ -7,37 +7,125 @@
     
     let currentUser = null;
     
-    // Auth state observer
-    auth.onAuthStateChanged((user) => {
-      currentUser = user;
-      if (user) {
-        // User is signed in
-        console.log('User signed in:', user.displayName);
-        document.getElementById('loginBtn').textContent = truncateName(user.displayName);
-        document.getElementById('loginBtn').onclick = () => {
-          document.getElementById('apiKeyInput').value = loadApiKey();
-          document.getElementById('breakDurationSelect').value = loadBreakDuration().toString();
-          document.getElementById('autoRestTimerToggle').checked = loadAutoRest();
-          document.getElementById('soundEffectsToggle').checked = loadSoundEffects();
-          document.getElementById('inlineCalcToggle').checked = loadInlineCalc();
-          document.getElementById('weightInput').value = loadUserWeight().toString();
-          document.getElementById('heightInput').value = loadUserHeight().toString();
-          document.getElementById('apiKeyMessage').style.display = loadApiKey() ? 'none' : 'block';
+    // ===== Token Management =====
+    const LS_AUTH_TOKEN = "GYM_AUTH_TOKEN_V1";
+    const LS_AUTH_TOKEN_EXPIRY = "GYM_AUTH_TOKEN_EXPIRY_V1";
+    const LS_USER_DISPLAY_NAME = "GYM_USER_DISPLAY_NAME_V1";
+    const LS_USER_UID = "GYM_USER_UID_V1";
+    const TOKEN_EXPIRY_DAYS = 30;
+    
+    function generateAuthToken() {
+      // Generate a unique token and store with expiry
+      const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const expiryTime = Date.now() + (TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+      localStorage.setItem(LS_AUTH_TOKEN, token);
+      localStorage.setItem(LS_AUTH_TOKEN_EXPIRY, expiryTime.toString());
+      return token;
+    }
+    
+    function isTokenValid() {
+      const token = localStorage.getItem(LS_AUTH_TOKEN);
+      const expiry = localStorage.getItem(LS_AUTH_TOKEN_EXPIRY);
+      
+      if (!token || !expiry) return false;
+      
+      const expiryTime = parseInt(expiry);
+      return Date.now() < expiryTime;
+    }
+    
+    function clearAuthToken() {
+      localStorage.removeItem(LS_AUTH_TOKEN);
+      localStorage.removeItem(LS_AUTH_TOKEN_EXPIRY);
+      localStorage.removeItem(LS_USER_DISPLAY_NAME);
+      localStorage.removeItem(LS_USER_UID);
+    }
+    
+    function saveUserSession(user) {
+      generateAuthToken();
+      localStorage.setItem(LS_USER_DISPLAY_NAME, user.displayName || '');
+      localStorage.setItem(LS_USER_UID, user.uid);
+    }
+    
+    function loadUserSession() {
+      if (!isTokenValid()) return null;
+      return {
+        displayName: localStorage.getItem(LS_USER_DISPLAY_NAME),
+        uid: localStorage.getItem(LS_USER_UID)
+      };
+    }
+    
+    function openUserModal() {
+      document.getElementById('apiKeyInput').value = loadApiKey();
+      document.getElementById('breakDurationSelect').value = loadBreakDuration().toString();
+      document.getElementById('autoRestTimerToggle').checked = loadAutoRest();
+      document.getElementById('soundEffectsToggle').checked = loadSoundEffects();
+      document.getElementById('inlineCalcToggle').checked = loadInlineCalc();
+      document.getElementById('weightInput').value = loadUserWeight().toString();
+      document.getElementById('heightInput').value = loadUserHeight().toString();
+      document.getElementById('apiKeyMessage').style.display = loadApiKey() ? 'none' : 'block';
 
-          // Update BMR display
-          const bmr = calculateBMR();
-          document.getElementById('bmrDisplay').textContent = `BMR: ${bmr} cal/day • Weight: ${loadUserWeight()}kg • Height: ${loadUserHeight()}ft`;
-          document.getElementById('userModal').style.display = 'flex';
+      // Update BMR display
+      const bmr = calculateBMR();
+      document.getElementById('bmrDisplay').textContent = `BMR: ${bmr} cal/day • Weight: ${loadUserWeight()}kg • Height: ${loadUserHeight()}ft`;
+      document.getElementById('userModal').style.display = 'flex';
+    }
+    
+    // Check for valid token on app load (no Firebase call needed)
+    function initializeAuthState() {
+      const sessionUser = loadUserSession();
+      
+      if (sessionUser && sessionUser.uid) {
+        // Token is valid, use cached user data
+        currentUser = {
+          displayName: sessionUser.displayName,
+          uid: sessionUser.uid
         };
-        // Load user data
-        loadUserData(user.uid);
+        console.log('User restored from token:', currentUser.displayName);
+        document.getElementById('loginBtn').textContent = truncateName(currentUser.displayName);
+        document.getElementById('loginBtn').onclick = openUserModal;
+        loadUserData(currentUser.uid);
       } else {
-        // User is signed out
+        // No valid token, user is logged out
+        currentUser = null;
         document.getElementById('loginBtn').textContent = 'Login with Google';
         document.getElementById('loginBtn').onclick = loginWithGoogle;
         // Load from localStorage
         history = JSON.parse(localStorage.getItem(LS_HISTORY) || "[]");
         activeWorkout = JSON.parse(localStorage.getItem(LS_ACTIVE) || "null");
+        userCustomWorkouts = loadCustomWorkouts();
+        userCustomExercises = loadCustomExercises();
+        favoriteWorkoutIds = new Set(loadFavoriteWorkoutIds());
+        syncUserCustomData();
+        updateResumeChip();
+        renderLibrary();
+        renderCalendar();
+        renderDayDetails(null);
+      }
+    }
+    
+    // Auth state observer - only for real-time updates after login/logout
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        // User just logged in via Firebase
+        currentUser = user;
+        console.log('User signed in via Firebase:', user.displayName);
+        saveUserSession(user);
+        document.getElementById('loginBtn').textContent = truncateName(user.displayName);
+        document.getElementById('loginBtn').onclick = openUserModal;
+        loadUserData(user.uid);
+      } else {
+        // User just logged out
+        currentUser = null;
+        clearAuthToken();
+        document.getElementById('loginBtn').textContent = 'Login with Google';
+        document.getElementById('loginBtn').onclick = loginWithGoogle;
+        // Load from localStorage
+        history = JSON.parse(localStorage.getItem(LS_HISTORY) || "[]");
+        activeWorkout = JSON.parse(localStorage.getItem(LS_ACTIVE) || "null");
+        userCustomWorkouts = loadCustomWorkouts();
+        userCustomExercises = loadCustomExercises();
+        favoriteWorkoutIds = new Set(loadFavoriteWorkoutIds());
+        syncUserCustomData();
         updateResumeChip();
         renderLibrary();
         renderCalendar();
@@ -83,6 +171,10 @@
           const data = doc.data() || {};
           history = Array.isArray(data.history) ? data.history : [];
           activeWorkout = data.activeWorkout || null;
+          userCustomWorkouts = Array.isArray(data.customWorkouts) ? data.customWorkouts : [];
+          userCustomExercises = Array.isArray(data.customExercises) ? data.customExercises : [];
+          favoriteWorkoutIds = new Set(Array.isArray(data.favoriteWorkoutIds) ? data.favoriteWorkoutIds : []);
+          syncUserCustomData();
           updateResumeChip();
           renderLibrary();
           renderCalendar();
@@ -90,6 +182,10 @@
           // First time user - initialize with empty data
           history = [];
           activeWorkout = null;
+          userCustomWorkouts = [];
+          userCustomExercises = [];
+          favoriteWorkoutIds = new Set(loadFavoriteWorkoutIds());
+          syncUserCustomData();
           updateResumeChip();
           renderLibrary();
           renderCalendar();
@@ -99,6 +195,10 @@
         // Fallback to localStorage data
         history = JSON.parse(localStorage.getItem(LS_HISTORY) || "[]");
         activeWorkout = JSON.parse(localStorage.getItem(LS_ACTIVE) || "null");
+        userCustomWorkouts = loadCustomWorkouts();
+        userCustomExercises = loadCustomExercises();
+        favoriteWorkoutIds = new Set(loadFavoriteWorkoutIds());
+        syncUserCustomData();
         updateResumeChip();
         renderLibrary();
         renderCalendar();
@@ -110,7 +210,10 @@
       if (!currentUser) return;
       const data = cleanObject({
         history: history || [],
-        activeWorkout: activeWorkout || null
+        activeWorkout: activeWorkout || null,
+        customWorkouts: userCustomWorkouts || [],
+        customExercises: userCustomExercises || [],
+        favoriteWorkoutIds: Array.from(favoriteWorkoutIds || [])
       });
       db.collection('users').doc(currentUser.uid).set(data, { merge: true })
         .catch((error) => {
@@ -122,6 +225,9 @@
             localStorage.removeItem(LS_ACTIVE);
           }
           localStorage.setItem(LS_HISTORY, JSON.stringify(history || []));
+          saveCustomWorkoutsLocal();
+          saveCustomExercisesLocal();
+          saveFavoriteWorkoutIdsLocal();
         });
     }
     
@@ -136,12 +242,17 @@
     const LS_USER_HEIGHT = "GYM_USER_HEIGHT_V1";
     const LS_SOUND_EFFECTS = "GYM_SOUND_EFFECTS_V1";
     const LS_INLINE_CALC = "GYM_INLINE_CALC_V1";
+    const LS_CUSTOM_WORKOUTS = "GYM_CUSTOM_WORKOUTS_V1";
+    const LS_CUSTOM_EXERCISES = "GYM_CUSTOM_EXERCISES_V1";
+    const LS_FAVORITE_WORKOUT_IDS = "GYM_FAVORITE_WORKOUT_IDS_V1";
 
     // Use comprehensive exercise database
     const ALL_EXERCISES = COMPREHENSIVE_EXERCISES.map(ex => ({
       ...ex,
       muscles: [ex.muscle] // Convert muscle to muscles array for consistency
     })).sort((a, b) => a.name.localeCompare(b.name));
+    const BASE_WORKOUT_TEMPLATES = WORKOUT_TEMPLATES.map(w => ({ ...w }));
+    const BASE_ALL_EXERCISES = ALL_EXERCISES.map(ex => ({ ...ex }));
 
     function truncateName(name, maxLen = 12) {
       return name.length > maxLen ? name.substring(0, maxLen) + '...' : name;
@@ -160,6 +271,10 @@
     let breakTimeRemaining = 0;
     let breakDuration = 90; // default 90 seconds
     let breakStartTime = null; // for accurate timing when app is backgrounded
+    let userCustomWorkouts = [];
+    let userCustomExercises = [];
+    let favoriteWorkoutIds = new Set();
+    let favoritesOnly = false;
 
     // ===== Utilities =====
     function loadHistory(){
@@ -181,6 +296,15 @@
       } else {
         if(activeWorkout) localStorage.setItem(LS_ACTIVE, JSON.stringify(activeWorkout));
         else localStorage.removeItem(LS_ACTIVE);
+      }
+    }
+    function saveCustomProfileData(){
+      if(currentUser){
+        saveUserData();
+      } else {
+        saveCustomWorkoutsLocal();
+        saveCustomExercisesLocal();
+        saveFavoriteWorkoutIdsLocal();
       }
     }
     function id(){ return Math.random().toString(36).slice(2,10) }
@@ -318,6 +442,147 @@ function evaluateInlineCalc(raw){
     }
     function saveInlineCalc(enabled){
       localStorage.setItem(LS_INLINE_CALC, enabled.toString());
+    }
+    function loadCustomWorkouts(){
+      try{ return JSON.parse(localStorage.getItem(LS_CUSTOM_WORKOUTS) || "[]"); }catch{ return [] }
+    }
+    function saveCustomWorkoutsLocal(){
+      localStorage.setItem(LS_CUSTOM_WORKOUTS, JSON.stringify(userCustomWorkouts || []));
+    }
+    function loadCustomExercises(){
+      try{ return JSON.parse(localStorage.getItem(LS_CUSTOM_EXERCISES) || "[]"); }catch{ return [] }
+    }
+    function saveCustomExercisesLocal(){
+      localStorage.setItem(LS_CUSTOM_EXERCISES, JSON.stringify(userCustomExercises || []));
+    }
+    function loadFavoriteWorkoutIds(){
+      try{
+        const ids = JSON.parse(localStorage.getItem(LS_FAVORITE_WORKOUT_IDS) || "[]");
+        return Array.isArray(ids) ? ids.filter(id => typeof id === "string" && id.trim()) : [];
+      }catch{
+        return [];
+      }
+    }
+    function saveFavoriteWorkoutIdsLocal(){
+      localStorage.setItem(LS_FAVORITE_WORKOUT_IDS, JSON.stringify(Array.from(favoriteWorkoutIds || [])));
+    }
+    function saveFavoriteWorkoutIds(){
+      if(currentUser){
+        saveUserData();
+      } else {
+        saveFavoriteWorkoutIdsLocal();
+      }
+    }
+    function isWorkoutFavorited(workoutId){
+      return !!workoutId && favoriteWorkoutIds.has(workoutId);
+    }
+    function toggleWorkoutFavorite(workoutId){
+      if(!workoutId) return;
+      if(favoriteWorkoutIds.has(workoutId)){
+        favoriteWorkoutIds.delete(workoutId);
+      } else {
+        favoriteWorkoutIds.add(workoutId);
+      }
+      saveFavoriteWorkoutIds();
+    }
+    function updateFavoritesOnlyButton(){
+      const btn = document.getElementById('favoritesOnlyBtn');
+      if(!btn) return;
+      btn.setAttribute('aria-pressed', String(favoritesOnly));
+      if(favoritesOnly){
+        btn.style.background = '#fbbf24';
+        btn.style.borderColor = '#fbbf24';
+        btn.style.color = '#111827';
+      } else {
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }
+    }
+    function removeWorkoutFromFavorites(workoutId){
+      if(!workoutId || !favoriteWorkoutIds.has(workoutId)) return;
+      favoriteWorkoutIds.delete(workoutId);
+      saveFavoriteWorkoutIds();
+    }
+    function addOrReplaceCustomWorkout(workout){
+      if(!workout?.id) return;
+      const idx = userCustomWorkouts.findIndex(w => w.id === workout.id);
+      if(idx >= 0) userCustomWorkouts[idx] = workout;
+      else userCustomWorkouts.push(workout);
+    }
+    function addOrReplaceCustomExercise(exercise){
+      if(!exercise?.name) return;
+      const idx = userCustomExercises.findIndex(ex => ex.name.toLowerCase() === exercise.name.toLowerCase());
+      if(idx >= 0) userCustomExercises[idx] = exercise;
+      else userCustomExercises.push(exercise);
+    }
+    function normalizeCustomExercise(ex){
+      if(!ex || !ex.name || !ex.muscle) return null;
+      return {
+        ...ex,
+        defaultSets: Number(ex.defaultSets) || 3,
+        defaultReps: Number(ex.defaultReps) || 10,
+        trackingType: ex.trackingType || "weight_reps",
+        muscles: [ex.muscle]
+      };
+    }
+    function syncUserCustomData(){
+      const byWorkoutId = new Map();
+      BASE_WORKOUT_TEMPLATES.forEach(w => byWorkoutId.set(w.id, { ...w }));
+      (userCustomWorkouts || []).forEach(w => {
+        if(w?.id) byWorkoutId.set(w.id, { ...w, isCustom: true });
+      });
+      WORKOUT_TEMPLATES.length = 0;
+      WORKOUT_TEMPLATES.push(...Array.from(byWorkoutId.values()));
+
+      const byExerciseName = new Map();
+      BASE_ALL_EXERCISES.forEach(ex => byExerciseName.set(ex.name.toLowerCase(), { ...ex }));
+      (userCustomExercises || []).forEach(ex => {
+        const normalized = normalizeCustomExercise(ex);
+        if(normalized){
+          byExerciseName.set(normalized.name.toLowerCase(), normalized);
+        }
+      });
+      ALL_EXERCISES.length = 0;
+      ALL_EXERCISES.push(...Array.from(byExerciseName.values()).sort((a,b)=>a.name.localeCompare(b.name)));
+    }
+    function deleteCustomWorkoutById(workoutId){
+      if(!workoutId) return;
+      const target = WORKOUT_TEMPLATES.find(w => w.id === workoutId);
+      if(!target || !target.isCustom){
+        showToast('Only custom workouts can be deleted', 'warn');
+        return;
+      }
+      const beforeCount = userCustomWorkouts.length;
+      userCustomWorkouts = userCustomWorkouts.filter(w => w.id !== workoutId);
+      if(userCustomWorkouts.length === beforeCount){
+        showToast('Workout not found', 'warn');
+        return;
+      }
+      removeWorkoutFromFavorites(workoutId);
+      syncUserCustomData();
+      saveCustomProfileData();
+      renderLibrary();
+      showToast('Custom workout deleted', 'success');
+    }
+    function deleteCustomExerciseByName(exerciseName){
+      if(!exerciseName) return;
+      const target = ALL_EXERCISES.find(ex => ex.name === exerciseName);
+      if(!target || !target.isCustom){
+        showToast('Only custom exercises can be deleted', 'warn');
+        return;
+      }
+      const beforeCount = userCustomExercises.length;
+      userCustomExercises = userCustomExercises.filter(ex => ex.name.toLowerCase() !== exerciseName.toLowerCase());
+      if(userCustomExercises.length === beforeCount){
+        showToast('Exercise not found', 'warn');
+        return;
+      }
+      selectedExercises.delete(exerciseName);
+      syncUserCustomData();
+      saveCustomProfileData();
+      renderExerciseSelector();
+      showToast('Custom exercise deleted', 'success');
     }
 
     // Calorie calculation utilities
@@ -490,14 +755,25 @@ function evaluateInlineCalc(raw){
 
       let items = WORKOUT_TEMPLATES
         .filter(w => {
+          if(favoritesOnly && !isWorkoutFavorited(w.id)) return false;
+          if(favoritesOnly) return true;
           if(activeMuscle === "All") return true;
           if(activeMuscle === "Custom") return w.isCustom;
+          if(activeMuscle === "Favorites") return isWorkoutFavorited(w.id);
           return w.muscles.includes(activeMuscle);
         })
         .filter(w => w.name.toLowerCase().includes(q));
 
-      // Sort to show custom first
-      items.sort((a,b) => (b.isCustom ? 1 : 0) - (a.isCustom ? 1 : 0));
+      // Sort favorites first, then custom, then name.
+      items.sort((a,b) => {
+        const favA = isWorkoutFavorited(a.id) ? 1 : 0;
+        const favB = isWorkoutFavorited(b.id) ? 1 : 0;
+        if(favA !== favB) return favB - favA;
+        const customA = a.isCustom ? 1 : 0;
+        const customB = b.isCustom ? 1 : 0;
+        if(customA !== customB) return customB - customA;
+        return a.name.localeCompare(b.name);
+      });
 
       grid.innerHTML = "";
       if(items.length === 0){
@@ -551,6 +827,7 @@ function evaluateInlineCalc(raw){
     function showTemplatePreview(tid){
       const t = getTemplateById(tid);
       if(!t) return;
+      const favorited = isWorkoutFavorited(t.id);
       // Remove existing preview if present
       const existing = document.getElementById('templatePreviewModal');
       if(existing) existing.remove();
@@ -573,7 +850,16 @@ function evaluateInlineCalc(raw){
         <div class="modal-content" role="dialog" aria-labelledby="templatePreviewTitle" style="max-width:640px">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
             <h3 id="templatePreviewTitle" style="margin:0">${t.name}</h3>
-          
+            <div style="display:flex; align-items:center; gap:8px">
+              <button id="togglePreviewFavoriteBtn" class="icon-btn" title="${favorited ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${favorited ? 'Remove from favorites' : 'Add to favorites'}">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="${favorited ? '#fbbf24' : '#cbd5e1'}" aria-hidden="true"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+              </button>
+              ${t.isCustom ? `
+                <button id="deletePreviewCustomBtn" class="icon-btn" aria-label="Delete custom workout" title="Delete custom workout">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="#fca5a5" aria-hidden="true"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+              ` : ''}
+            </div>
           </div>
           <div style="margin-top:8px; color:var(--muted)">Muscles: ${t.muscles.join(', ')} • Est. ${estimatedCalories} cal</div>
           <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow:auto; padding-right:8px">
@@ -610,6 +896,24 @@ function evaluateInlineCalc(raw){
           const tid = startBtn.getAttribute('data-start');
           modal.remove();
           startWorkoutFromTemplate(tid);
+        });
+      }
+      const favoriteBtn = modal.querySelector('#togglePreviewFavoriteBtn');
+      if(favoriteBtn){
+        favoriteBtn.addEventListener('click', () => {
+          toggleWorkoutFavorite(t.id);
+          renderLibrary();
+          modal.remove();
+          showTemplatePreview(t.id);
+        });
+      }
+      const deleteBtn = modal.querySelector('#deletePreviewCustomBtn');
+      if(deleteBtn){
+        deleteBtn.addEventListener('click', () => {
+          const ok = confirm(`Delete custom workout "${t.name}"?`);
+          if(!ok) return;
+          deleteCustomWorkoutById(t.id);
+          modal.remove();
         });
       }
     }
@@ -1144,6 +1448,11 @@ function evaluateInlineCalc(raw){
         el.innerHTML = `
           <div class="title-row">
             <h3>${ex.name}</h3>
+            ${ex.isCustom ? `
+              <button class="icon-btn" data-delete-custom-exercise="${ex.name}" title="Delete custom exercise" aria-label="Delete custom exercise">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="#fca5a5" aria-hidden="true"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+              </button>
+            ` : ''}
           </div>
           <div class="badges">
             ${ex.muscles.map(m => `<span class="badge">${m}</span>`).join("")}
@@ -1198,6 +1507,11 @@ function evaluateInlineCalc(raw){
         el.innerHTML = `
           <div class="title-row">
             <h3>${ex.name}</h3>
+            ${ex.isCustom ? `
+              <button class="icon-btn" data-delete-custom-exercise="${ex.name}" title="Delete custom exercise" aria-label="Delete custom exercise">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="#fca5a5" aria-hidden="true"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+              </button>
+            ` : ''}
           </div>
           <div class="badges">
             ${ex.muscles.map(m => `<span class="badge">${m}</span>`).join("")}
@@ -1449,7 +1763,7 @@ function evaluateInlineCalc(raw){
         const aiSection = document.getElementById('aiSummarySection');
         const aiContent = document.getElementById('aiSummaryContent');
 
-        if (record.summary && (record.summary.rating || record.summary.keyMetrics || record.summary.comparison || record.summary.tips)) {
+        if (hasUsableSummary(record)) {
           // Show AI section if elements exist
           if (aiSection) {
             aiSection.style.display = 'block';
@@ -1470,7 +1784,7 @@ function evaluateInlineCalc(raw){
           }
 
           if (record.summary.tips) {
-            const tips = Array.isArray(record.summary.tips) ? record.summary.tips : [record.summary.tips];
+            const tips = splitSummaryTextToItems(record.summary.tips);
             if (tips.length > 0) {
               content += `<div style="margin-bottom: 8px;"><strong>Tips:</strong></div><ul>`;
               tips.forEach(tip => {
@@ -1589,6 +1903,21 @@ function evaluateInlineCalc(raw){
       shareBtn.textContent = 'Share';
       shareBtn.addEventListener('click', () => shareWorkout(record));
 
+      if (!hasUsableSummary(record)) {
+        const summaryBtn = document.createElement('button');
+        summaryBtn.className = 'btn';
+        summaryBtn.id = 'generateSummaryBtn';
+        summaryBtn.textContent = 'Generate AI Summary';
+        summaryBtn.addEventListener('click', async () => {
+          summaryBtn.disabled = true;
+          summaryBtn.textContent = 'Generating...';
+          await generateWorkoutSummary(record.id);
+          const latestRecord = history.find(h => h.id === record.id) || record;
+          populateWorkoutDetailModal(latestRecord);
+        });
+        footer.appendChild(summaryBtn);
+      }
+
       // Close button
       const closeBtn = document.createElement('button');
       closeBtn.className = 'btn secondary';
@@ -1611,6 +1940,51 @@ function evaluateInlineCalc(raw){
       // Add footer to modal
       const modalContent = document.querySelector('#workoutDetailModal .modal-content');
       modalContent.appendChild(footer);
+    }
+    function hasUsableSummary(record){
+      if(!record || !record.summary || typeof record.summary !== 'object') return false;
+      return !!(
+        (typeof record.summary.rating === 'string' && record.summary.rating.trim()) ||
+        (typeof record.summary.keyMetrics === 'string' && record.summary.keyMetrics.trim()) ||
+        (typeof record.summary.comparison === 'string' && record.summary.comparison.trim()) ||
+        (Array.isArray(record.summary.tips) && record.summary.tips.some(t => typeof t === 'string' && t.trim())) ||
+        (typeof record.summary.tips === 'string' && record.summary.tips.trim())
+      );
+    }
+    // Normalize mixed summary text into list items (supports numbered strings like "1. ... 2. ...").
+    function splitSummaryTextToItems(val, { bySentences = false } = {}){
+      const normalizeItem = (text) => String(text || '')
+        .replace(/^\s*(?:[-•]|\d+[\).\:-])\s*/, '')
+        .trim();
+
+      if (Array.isArray(val)) {
+        return val
+          .flatMap(v => splitSummaryTextToItems(v, { bySentences }))
+          .filter(Boolean);
+      }
+      if (typeof val !== 'string') return [];
+
+      const s = val.trim();
+      if (!s) return [];
+
+      let items = [];
+      if (bySentences) {
+        items = s.split(/(?<=[.!?])\s+/g);
+      } else if (/\d+[\).\:-]\s+/.test(s)) {
+        items = s.split(/\s+(?=\d+[\).\:-]\s+)/g);
+      } else if (s.includes('\n')) {
+        items = s.split(/\n+/g);
+      } else if (s.includes('•') || s.includes('â€¢')) {
+        items = s.split(/(?:•|â€¢)/g);
+      } else if (s.includes(';')) {
+        items = s.split(';');
+      } else if (s.includes(',')) {
+        items = s.split(',');
+      } else {
+        items = [s];
+      }
+
+      return items.map(normalizeItem).filter(Boolean);
     }
 
     function shareWorkout(record) {
@@ -1831,11 +2205,13 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
         });
 
         workout.isCustom = true;
+        workout.id = `custom-${id()}`;
 
         document.getElementById('statusText').textContent = 'Saving workout to library...';
 
-        // Add to templates
-        WORKOUT_TEMPLATES.push(workout);
+        addOrReplaceCustomWorkout(workout);
+        syncUserCustomData();
+        saveCustomProfileData();
 
         document.getElementById('statusText').textContent = 'Finalizing...';
         // Close modal
@@ -1869,7 +2245,7 @@ Make sure the exercises are real and have valid musclewiki links. Include approp
       const apiKey = loadApiKey();
       if (!apiKey) {
         showToast('Set Gemini API key for workout summaries', 'warn');
-        return;
+        return false;
       }
 
       // Resolve target record for summary + past workouts
@@ -1961,10 +2337,12 @@ Keep everything minimal and actionable.`;
         // Continue existing UX: show summary modal
         const calories = Number.isFinite(rec?.calories) ? rec.calories : (rec ? calculateWorkoutCalories({ exercises: rec.exercises }) : 0);
         showWorkoutSummaryModal(result, calories);
+        return true;
       } catch (error) {
         console.error('Error generating summary:', error);
         // Do not block UX; notify and exit
         showToast('Failed to generate workout summary', 'error');
+        return false;
       }
     }
 
@@ -2026,7 +2404,7 @@ Keep everything minimal and actionable.`;
       }
 
       // Key Metrics
-      const metricsItems = splitToItems(result.keyMetrics);
+      const metricsItems = splitSummaryTextToItems(result.keyMetrics);
       if (metricsItems.length > 0) {
         const li = document.createElement('li');
         li.textContent = 'Key Metrics:';
@@ -2041,7 +2419,7 @@ Keep everything minimal and actionable.`;
       }
 
       // Comparison
-      const comparisonItems = splitToItems(result.comparison, { bySentences: true });
+      const comparisonItems = splitSummaryTextToItems(result.comparison, { bySentences: true });
       if (comparisonItems.length > 0) {
         const li = document.createElement('li');
         li.textContent = 'Comparison:';
@@ -2060,7 +2438,7 @@ Keep everything minimal and actionable.`;
       }
 
       // Tips
-      const tipsItems = splitToItems(result.tips);
+      const tipsItems = splitSummaryTextToItems(result.tips);
       if (tipsItems.length > 0) {
         const li = document.createElement('li');
         li.textContent = 'Tips:';
@@ -2095,6 +2473,7 @@ Keep everything minimal and actionable.`;
 
       // User modal
         document.getElementById('logoutBtn').addEventListener('click', () => {
+          clearAuthToken();
           auth.signOut();
           document.getElementById('userModal').style.display = 'none';
         });
@@ -2164,6 +2543,14 @@ Keep everything minimal and actionable.`;
       // Library search
       const search = document.getElementById("searchInput");
       search.addEventListener("input", renderLibrary);
+      const favoritesOnlyBtn = document.getElementById("favoritesOnlyBtn");
+      if(favoritesOnlyBtn){
+        favoritesOnlyBtn.addEventListener("click", () => {
+          favoritesOnly = !favoritesOnly;
+          updateFavoritesOnlyButton();
+          renderLibrary();
+        });
+      }
 
       // Open custom exercise modal (replaces inline toggle)
       document.getElementById("toggleCustomExerciseFormBtn").addEventListener("click", () => {
@@ -2256,6 +2643,18 @@ Keep everything minimal and actionable.`;
       });
       document.getElementById("exerciseSearchInput").addEventListener("input", renderExerciseSelector);
       document.getElementById("exerciseSelectorGrid").addEventListener("click", (e) => {
+        const deleteCustomExerciseBtn = e.target.closest("[data-delete-custom-exercise]");
+        if(deleteCustomExerciseBtn){
+          const exerciseName = deleteCustomExerciseBtn.getAttribute("data-delete-custom-exercise");
+          const target = ALL_EXERCISES.find(ex => ex.name === exerciseName);
+          if(target && target.isCustom){
+            const ok = confirm(`Delete custom exercise "${exerciseName}"?`);
+            if(ok) deleteCustomExerciseByName(exerciseName);
+          } else {
+            showToast('Only custom exercises can be deleted', 'warn');
+          }
+          return;
+        }
         const card = e.target.closest(".card");
         if(!card) return;
         const exerciseName = card.dataset.exercise;
@@ -2304,11 +2703,13 @@ Keep everything minimal and actionable.`;
           defaultReps,
           exercise_link,
           trackingType,
+          isCustom: true,
           muscles: [muscle] // For consistency
         };
 
-        // Add to ALL_EXERCISES
-        ALL_EXERCISES.push(newExercise);
+        addOrReplaceCustomExercise(newExercise);
+        syncUserCustomData();
+        saveCustomProfileData();
 
         // Mark as selected in current selector context
         selectedExercises.add(name);
@@ -2402,12 +2803,18 @@ Keep everything minimal and actionable.`;
     function init(){
        breakDuration = loadBreakDuration();
        calendarCursor = new Date();
+       favoriteWorkoutIds = new Set(loadFavoriteWorkoutIds());
+       
+       // Initialize auth state from token (no Firebase call needed)
+       initializeAuthState();
+       
        updateResumeChip();
        renderLibrary();
        renderCalendar();
        const today = todayKey();
        renderDayDetails(today);
        bindEvents();
+       updateFavoritesOnlyButton();
 
        // Register service worker
        if ('serviceWorker' in navigator) {
