@@ -79,7 +79,7 @@ header.app-header {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 0 24px;
+  padding: 20px 0 20px;
   position: sticky;
   top: 0;
   background: var(--bg);
@@ -149,11 +149,13 @@ header.app-header {
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  column-gap: 4px;
   gap: 4px;
   padding: 6px;
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.03);
-  margin-bottom: var(--gap-lg);
+  margin-top: 5px;
+  margin-bottom: 5px;
   border: 1px solid var(--border);
 }
 
@@ -197,6 +199,11 @@ header.app-header {
 
 .panel.active {
   display: block;
+}
+
+#panel-library {
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
 /* Exercise Library */
@@ -1233,7 +1240,7 @@ header.app-header {
 /* Desktop styles (1024px+) */
 @media (min-width: 1024px) {
   .container {
-    padding: 0 40px;
+    padding: 0 40px 120px;
   }
 
   header.app-header {
@@ -1241,8 +1248,17 @@ header.app-header {
   }
 
   .tabs {
-    max-width: 400px;
-    margin: 0 auto var(--gap-lg);
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 120;
+    width: min(420px, calc(100vw - 48px));
+    margin: 0;
+    background: rgba(15, 18, 25, 0.9);
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
   }
 
   .calendar-grid {
