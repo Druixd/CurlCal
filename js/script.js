@@ -2775,36 +2775,497 @@ function evaluateInlineCalc(raw){
       return items.map(normalizeItem).filter(Boolean);
     }
 
-    function shareWorkout(record) {
-      // Build a concise share text
+    function getWorkoutShareText(record){
       const parts = [];
       parts.push(`${record.name} • ${record.minutes} min • ${record.calories || 0} cal`);
 
-      record.exercises.forEach(ex => {
+      (record.exercises || []).forEach(ex => {
         const sets = (ex.sets || []).map(s => {
-          if (ex.name === 'Plank') {
-            return `${s.weight || 0}kg/${s.time || 0}s`;
-          } else if ('time' in s || 'distance' in s) {
-            return `${s.time || 0}min/${s.distance || 0}km`;
-          }
+          if (ex.name === "Plank") return `${s.weight || 0}kg/${s.time || 0}s`;
+          if ("time" in s || "distance" in s) return `${s.time || 0}min/${s.distance || 0}km`;
           return `${s.weight || 0}kg×${s.reps || 0}`;
-        }).join(', ');
+        }).join(", ");
         parts.push(`${ex.name}: ${sets}`);
       });
 
-      const text = parts.join('\n');
-
-      if (navigator.share) {
-        navigator.share({ title: record.name, text }).catch(()=>{/* ignore */});
-      } else {
-        // fallback copy to clipboard
-        navigator.clipboard?.writeText(text).then(
-          () => showToast('Workout copied to clipboard'),
-          () => showToast('Copy failed','error')
-        );
-      }
+      return parts.join("\n");
     }
 
+    function getWorkoutShareStats(record){
+      const exercises = record?.exercises || [];
+      const totalSets = exercises.reduce((sum, ex) => sum + ((ex.sets || []).length), 0);
+      const completedSets = exercises.reduce((sum, ex) => sum + ((ex.sets || []).filter(s => s.completed).length), 0);
+      const completionPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
+      const volume = exercises.reduce((sum, ex) => {
+        return sum + (ex.sets || []).reduce((setSum, s) => setSum + ((s.weight || 0) * (s.reps || 0)), 0);
+      }, 0);
+      const topExercises = exercises.slice(0, 4).map(ex => ex.name).filter(Boolean);
+      const completedAt = record.completedAt ? new Date(record.completedAt) : null;
+      const completedAtLabel = completedAt && !isNaN(completedAt.getTime()) ? completedAt.toLocaleString() : "-";
+      return { totalSets, completedSets, completionPct, volume, topExercises, completedAtLabel };
+    }
+
+    function roundedRect(ctx, x, y, width, height, radius){
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, color, maxLines = Infinity){
+      const words = String(text || "").split(/\s+/).filter(Boolean);
+      if(!words.length) return y;
+      ctx.fillStyle = color;
+      let line = "";
+      let lines = 0;
+      const flushLine = (textLine, isLastLine = false) => {
+        let finalText = textLine;
+        if(isLastLine && lines + 1 >= maxLines){
+          while(finalText.length > 0 && ctx.measureText(`${finalText}...`).width > maxWidth){
+            finalText = finalText.slice(0, -1);
+          }
+          finalText = `${finalText}...`;
+        }
+        ctx.fillText(finalText, x, y);
+        y += lineHeight;
+        lines += 1;
+      };
+
+      for(let i = 0; i < words.length; i += 1){
+        const word = words[i];
+        const test = line ? `${line} ${word}` : word;
+        if(ctx.measureText(test).width > maxWidth && line){
+          const isLast = lines + 1 >= maxLines;
+          flushLine(line, isLast);
+          if(isLast) return y;
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if(line && lines < maxLines){
+        flushLine(line, lines + 1 >= maxLines);
+      }
+      return y;
+    }
+
+    function readThemeVar(name, fallback){
+      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return value || fallback;
+    }
+
+    function getShareImageTheme(){
+      return {
+        bg: readThemeVar("--bg", "#0a0a0a"),
+        card: readThemeVar("--card", "#101010"),
+        text: readThemeVar("--text", "#f1f5f9"),
+        muted: readThemeVar("--muted", "rgba(241,245,249,0.6)"),
+        border: readThemeVar("--border", "#212121"),
+        primary: readThemeVar("--primary", "#9ce419"),
+        accent: readThemeVar("--accent", "#00d4f0"),
+        muscleOutline: readThemeVar("--muscle-outline", "rgba(241,245,249,0.35)"),
+        muscleByGroup: {
+          "Chest": readThemeVar("--muscle-chest", "#ff6f79"),
+          "Back": readThemeVar("--muscle-back", "#35d6c8"),
+          "Shoulders": readThemeVar("--muscle-shoulders", "#ff9f6e"),
+          "Arms": readThemeVar("--muscle-arms", "#7ec8ff"),
+          "Legs": readThemeVar("--muscle-legs", "#a9d96f"),
+          "Core": readThemeVar("--muscle-core", "#ffd36e"),
+          "Full Body": readThemeVar("--muscle-full-body", "#d68bff")
+        }
+      };
+    }
+
+    function buildRegionColorMap(targets, theme){
+      const normalizedTargets = Array.isArray(targets)
+        ? MUSCLE_GROUP_ORDER.filter(group => new Set(targets.map(normalizeMuscleLabel)).has(group))
+        : [];
+      const hasFullBody = normalizedTargets.includes("Full Body");
+      const regionColorMap = new Map();
+
+      if(hasFullBody){
+        ["front", "back"].forEach(view => {
+          allRegionIdsForView(view).forEach(regionId => {
+            regionColorMap.set(regionId, theme.muscleByGroup["Full Body"]);
+          });
+        });
+      } else {
+        normalizedTargets.forEach(group => {
+          const color = theme.muscleByGroup[group] || theme.muscleByGroup["Full Body"];
+          ["front", "back"].forEach(view => {
+            (MUSCLE_REGION_MAP[group]?.[view] || []).forEach(regionId => {
+              regionColorMap.set(regionId, color);
+            });
+          });
+        });
+      }
+      return { normalizedTargets, regionColorMap };
+    }
+
+    function loadImageFromDataUrl(dataUrl){
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
+    }
+
+    async function buildHighlightedMuscleSvgImage(view, regionColorMap, theme){
+      const svgMarkup = await loadMuscleSvgMarkup(view);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgMarkup, "image/svg+xml");
+      const svgEl = doc.querySelector("svg");
+      if(!svgEl) throw new Error(`Invalid muscle svg for ${view}`);
+
+      svgEl.removeAttribute("class");
+      svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+      svgEl.querySelectorAll("g.hidden").forEach(el => el.remove());
+      svgEl.querySelectorAll("g.bodymap[id]").forEach(group => {
+        const color = regionColorMap.get(group.id);
+        group.style.color = color || "transparent";
+      });
+      svgEl.querySelectorAll("[stroke]").forEach(shape => {
+        shape.setAttribute("stroke", theme.muscleOutline);
+      });
+
+      const svgText = new XMLSerializer().serializeToString(svgEl);
+      const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}`;
+      return loadImageFromDataUrl(dataUrl);
+    }
+
+    function drawImageContain(ctx, img, x, y, width, height){
+      const scale = Math.min(width / img.width, height / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const dx = x + (width - w) / 2;
+      const dy = y + (height - h) / 2;
+      ctx.drawImage(img, dx, dy, w, h);
+    }
+
+    function drawMetricCard(ctx, x, y, width, height, metric, theme){
+      roundedRect(ctx, x, y, width, height, 14);
+      ctx.fillStyle = theme.card;
+      ctx.fill();
+      ctx.strokeStyle = theme.border;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = theme.muted;
+      ctx.font = "600 24px 'Segoe UI', sans-serif";
+      ctx.fillText(metric.label, x + 20, y + 42);
+      ctx.fillStyle = theme.text;
+      ctx.font = "700 42px 'Segoe UI', sans-serif";
+      ctx.fillText(metric.value, x + 20, y + 96);
+    }
+
+    async function createWorkoutSummaryImageBlob(record){
+      const width = 1200;
+      const height = 1600;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      const stats = getWorkoutShareStats(record);
+      const theme = getShareImageTheme();
+      const completionColor = stats.completionPct >= 90 ? theme.primary : theme.accent;
+
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, theme.bg);
+      gradient.addColorStop(1, theme.card);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = theme.primary;
+      roundedRect(ctx, 24, 24, width - 48, height - 48, 34);
+      ctx.fill();
+      ctx.restore();
+
+      const cardX = 52;
+      const cardY = 52;
+      const cardW = width - 104;
+      const cardH = height - 104;
+      roundedRect(ctx, cardX, cardY, cardW, cardH, 28);
+      ctx.fillStyle = theme.bg;
+      ctx.fill();
+      ctx.strokeStyle = theme.border;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      let y = cardY + 60;
+      const contentX = cardX + 42;
+      const contentW = cardW - 84;
+
+      ctx.fillStyle = theme.primary;
+      ctx.font = "700 26px 'Segoe UI', sans-serif";
+      ctx.fillText("CURLCAL WORKOUT SUMMARY", contentX, y);
+      ctx.fillStyle = "rgba(156, 228, 25, 0.4)";
+      roundedRect(ctx, contentX, y + 14, 260, 5, 3);
+      ctx.fill();
+      y += 48;
+
+      ctx.font = "700 58px 'Segoe UI', sans-serif";
+      y = drawWrappedText(ctx, record.name || "Workout", contentX, y, contentW, 66, theme.text, 2);
+      y += 8;
+
+      ctx.font = "500 28px 'Segoe UI', sans-serif";
+      ctx.fillStyle = theme.muted;
+      ctx.fillText(`Completed: ${stats.completedAtLabel}`, contentX, y);
+      y += 40;
+      ctx.fillText(`Duration: ${record.minutes || 0} min`, contentX, y);
+      y += 38;
+
+      const metrics = [
+        { label: "Calories", value: `${record.calories || 0}` },
+        { label: "Exercises", value: `${(record.exercises || []).length}` },
+        { label: "Sets", value: `${stats.completedSets}/${stats.totalSets}` },
+        { label: "Completion", value: `${stats.completionPct}%` }
+      ];
+      const metricGap = 12;
+      const metricW = (contentW - (metricGap * 3)) / 4;
+      const metricH = 120;
+      metrics.forEach((metric, idx) => {
+        const x = contentX + idx * (metricW + metricGap);
+        drawMetricCard(ctx, x, y, metricW, metricH, metric, theme);
+        if(metric.label === "Completion"){
+          ctx.strokeStyle = completionColor;
+          ctx.lineWidth = 3;
+          roundedRect(ctx, x, y, metricW, metricH, 14);
+          ctx.stroke();
+        }
+      });
+      y += metricH + 24;
+
+      const musclePanelH = 640;
+      roundedRect(ctx, contentX, y, contentW, musclePanelH, 18);
+      ctx.fillStyle = theme.card;
+      ctx.fill();
+      ctx.strokeStyle = theme.border;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(0, 212, 240, 0.18)";
+      roundedRect(ctx, contentX + 18, y + 18, 210, 7, 4);
+      ctx.fill();
+
+      ctx.fillStyle = theme.text;
+      ctx.font = "700 34px 'Segoe UI', sans-serif";
+      ctx.fillText("Targeted Muscles", contentX + 24, y + 52);
+
+      const targets = buildMuscleTargets(record.exercises || []);
+      const { normalizedTargets, regionColorMap } = buildRegionColorMap(targets, theme);
+      const mapTop = y + 80;
+      const mapGap = 14;
+      const mapW = (contentW - 48 - mapGap) / 2;
+      const mapH = 430;
+      const frontX = contentX + 16;
+      const backX = frontX + mapW + mapGap;
+
+      const drawMapShell = (x, label) => {
+        roundedRect(ctx, x, mapTop, mapW, mapH, 14);
+        ctx.fillStyle = theme.bg;
+        ctx.fill();
+        ctx.strokeStyle = theme.border;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(0, 212, 240, 0.3)";
+        ctx.lineWidth = 1.5;
+        roundedRect(ctx, x + 8, mapTop + 8, mapW - 16, mapH - 16, 11);
+        ctx.stroke();
+        ctx.fillStyle = theme.muted;
+        ctx.font = "700 22px 'Segoe UI', sans-serif";
+        ctx.fillText(label, x + 14, mapTop + 30);
+      };
+      drawMapShell(frontX, "Front");
+      drawMapShell(backX, "Back");
+
+      try{
+        const [frontImg, backImg] = await Promise.all([
+          buildHighlightedMuscleSvgImage("front", regionColorMap, theme),
+          buildHighlightedMuscleSvgImage("back", regionColorMap, theme)
+        ]);
+        drawImageContain(ctx, frontImg, frontX + 12, mapTop + 42, mapW - 24, mapH - 54);
+        drawImageContain(ctx, backImg, backX + 12, mapTop + 42, mapW - 24, mapH - 54);
+      } catch(error){
+        ctx.fillStyle = theme.muted;
+        ctx.font = "500 24px 'Segoe UI', sans-serif";
+        ctx.fillText("Muscle preview unavailable", frontX + 20, mapTop + mapH / 2);
+      }
+
+      y += musclePanelH - 62;
+      const targetItems = normalizedTargets.length ? normalizedTargets : ["No target muscles"];
+      let chipX = contentX + 24;
+      let chipY = y;
+      ctx.font = "700 20px 'Segoe UI', sans-serif";
+      targetItems.forEach((item, idx) => {
+        const textW = ctx.measureText(item).width;
+        const chipW = Math.ceil(textW + 28);
+        const chipH = 34;
+        if(chipX + chipW > contentX + contentW - 24){
+          chipX = contentX + 24;
+          chipY += chipH + 10;
+        }
+        const chipColor = theme.muscleByGroup[item] || theme.accent;
+        ctx.fillStyle = "rgba(255,255,255,0.02)";
+        roundedRect(ctx, chipX, chipY, chipW, chipH, 17);
+        ctx.fill();
+        ctx.strokeStyle = chipColor;
+        ctx.lineWidth = idx === 0 ? 2.6 : 1.6;
+        roundedRect(ctx, chipX, chipY, chipW, chipH, 17);
+        ctx.stroke();
+        ctx.fillStyle = idx === 0 ? theme.text : theme.muted;
+        ctx.fillText(item, chipX + 14, chipY + 23);
+        chipX += chipW + 10;
+      });
+      y = chipY + 48;
+
+      const listPanelH = 270;
+      roundedRect(ctx, contentX, y, contentW, listPanelH, 18);
+      ctx.fillStyle = theme.card;
+      ctx.fill();
+      ctx.strokeStyle = theme.border;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(156, 228, 25, 0.16)";
+      roundedRect(ctx, contentX + 18, y + 18, 164, 7, 4);
+      ctx.fill();
+
+      ctx.fillStyle = theme.text;
+      ctx.font = "700 30px 'Segoe UI', sans-serif";
+      ctx.fillText("Top Exercises", contentX + 24, y + 44);
+      ctx.font = "600 26px 'Segoe UI', sans-serif";
+      const topExercises = stats.topExercises.length ? stats.topExercises : ["No exercise data"];
+      topExercises.slice(0, 4).forEach((name, idx) => {
+        const rowY = y + 62 + (idx * 44);
+        const rowH = 36;
+        ctx.fillStyle = idx === 0 ? "rgba(0, 212, 240, 0.12)" : "rgba(255,255,255,0.02)";
+        roundedRect(ctx, contentX + 20, rowY, contentW - 40, rowH, 10);
+        ctx.fill();
+        ctx.strokeStyle = idx === 0 ? theme.accent : theme.border;
+        ctx.lineWidth = idx === 0 ? 2 : 1;
+        roundedRect(ctx, contentX + 20, rowY, contentW - 40, rowH, 10);
+        ctx.stroke();
+        ctx.fillStyle = idx === 0 ? theme.text : theme.muted;
+        ctx.fillText(`${idx + 1}. ${name}`, contentX + 34, rowY + 25);
+      });
+
+      ctx.fillStyle = completionColor;
+      ctx.font = "600 26px 'Segoe UI', sans-serif";
+      ctx.fillText(`Total Training Volume: ${Math.round(stats.volume)} kg`, contentX + 24, y + listPanelH - 28);
+
+      ctx.fillStyle = theme.muted;
+      ctx.font = "600 22px 'Segoe UI', sans-serif";
+      ctx.fillText("Created with CurlCal", contentX, y + listPanelH + 48);
+
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png", 1));
+      if(!blob) throw new Error("Unable to generate image");
+      return blob;
+    }
+    function downloadBlob(blob, filename){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function sanitizeFilename(name){
+      return String(name || "workout")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 64) || "workout";
+    }
+
+    function showShareWorkoutOptions(){
+      return new Promise(resolve => {
+        const modal = document.createElement("div");
+        modal.className = "modal";
+        modal.style.display = "flex";
+        modal.innerHTML = `
+          <div class="modal-content" role="dialog" aria-labelledby="shareWorkoutTitle" style="max-width:440px">
+            <h3 id="shareWorkoutTitle" style="margin:0 0 6px 0">Share Workout</h3>
+            <p class="muted" style="margin:0 0 14px 0">Choose how you want to share this workout.</p>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <button id="shareOptionText" class="btn">Share Current Format</button>
+              <button id="shareOptionImage" class="btn secondary">Share Summary Image (PNG)</button>
+            </div>
+            <div class="modal-footer" style="padding-top:12px;">
+              <button id="shareOptionCancel" class="btn secondary">Cancel</button>
+            </div>
+          </div>
+        `;
+
+        const cleanup = (value) => {
+          document.removeEventListener("keydown", onKeydown);
+          modal.remove();
+          resolve(value);
+        };
+        const onKeydown = (e) => {
+          if(e.key === "Escape") cleanup(null);
+        };
+        document.addEventListener("keydown", onKeydown);
+        modal.addEventListener("click", (e) => {
+          if(e.target === modal) cleanup(null);
+        });
+        modal.querySelector("#shareOptionText").addEventListener("click", () => cleanup("text"));
+        modal.querySelector("#shareOptionImage").addEventListener("click", () => cleanup("image"));
+        modal.querySelector("#shareOptionCancel").addEventListener("click", () => cleanup(null));
+        document.body.appendChild(modal);
+      });
+    }
+
+    async function shareWorkout(record) {
+      const choice = await showShareWorkoutOptions();
+      if(!choice) return;
+
+      if(choice === "text"){
+        const text = getWorkoutShareText(record);
+        if(navigator.share){
+          navigator.share({ title: record.name, text }).catch(()=>{/* ignore */});
+        } else {
+          navigator.clipboard?.writeText(text).then(
+            () => showToast("Workout copied to clipboard"),
+            () => showToast("Copy failed", "error")
+          );
+        }
+        return;
+      }
+
+      if(choice === "image"){
+        try{
+          const blob = await createWorkoutSummaryImageBlob(record);
+          const filename = `${sanitizeFilename(record?.name)}-summary.png`;
+          const shareFile = new File([blob], filename, { type: "image/png" });
+          if(navigator.share && navigator.canShare && navigator.canShare({ files: [shareFile] })){
+            await navigator.share({
+              title: `${record.name} - Workout Summary`,
+              text: `${record.name} workout summary`,
+              files: [shareFile]
+            });
+          } else {
+            downloadBlob(blob, filename);
+            showToast("Summary image downloaded");
+          }
+        } catch(error){
+          console.error("Failed to share workout summary image", error);
+          showToast("Failed to create summary image", "error");
+        }
+      }
+    }
     function renderDayDetails(dateKey){
       const box = document.getElementById("dayDetails");
       const title = document.getElementById("detailsTitle");
