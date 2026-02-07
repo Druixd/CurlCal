@@ -270,6 +270,274 @@
       return name.length > maxLen ? name.substring(0, maxLen) + '...' : name;
     }
 
+    const MUSCLE_GROUP_ORDER = ["Chest", "Back", "Shoulders", "Arms", "Legs", "Core", "Full Body"];
+    const MUSCLE_COLOR_MAP = {
+      "Chest": "var(--muscle-chest)",
+      "Back": "var(--muscle-back)",
+      "Shoulders": "var(--muscle-shoulders)",
+      "Arms": "var(--muscle-arms)",
+      "Legs": "var(--muscle-legs)",
+      "Core": "var(--muscle-core)",
+      "Full Body": "var(--muscle-full-body)"
+    };
+    const MUSCLE_REGION_MAP = {
+      "Chest": {
+        front: ["chest"],
+        back: []
+      },
+      "Back": {
+        front: ["traps"],
+        back: ["traps", "traps-middle", "lats"]
+      },
+      "Shoulders": {
+        front: ["front-shoulders"],
+        back: ["rear-shoulders"]
+      },
+      "Arms": {
+        front: ["biceps", "forearms", "hands"],
+        back: ["triceps", "forearms", "hands"]
+      },
+      "Legs": {
+        front: ["quads", "calves"],
+        back: ["hamstrings", "calves", "glutes"]
+      },
+      "Core": {
+        front: ["abdominals", "obliques"],
+        back: ["lowerback"]
+      },
+      "Full Body": {
+        front: [],
+        back: []
+      }
+    };
+    const MUSCLE_SVG_FILES = {
+      front: "img/front.svg",
+      back: "img/back.svg"
+    };
+    const muscleSvgMarkupCache = new Map();
+    const MUSCLE_LABEL_NORMALIZATION = {
+      chest: "Chest",
+      back: "Back",
+      shoulders: "Shoulders",
+      shoulder: "Shoulders",
+      delts: "Shoulders",
+      arms: "Arms",
+      biceps: "Arms",
+      triceps: "Arms",
+      forearms: "Arms",
+      legs: "Legs",
+      leg: "Legs",
+      quads: "Legs",
+      hamstrings: "Legs",
+      calves: "Legs",
+      glutes: "Legs",
+      core: "Core",
+      abs: "Core",
+      abdominals: "Core",
+      cardio: "Full Body",
+      bodyweight: "Full Body",
+      "full body": "Full Body",
+      "full-body": "Full Body",
+      total: "Full Body"
+    };
+
+    function normalizeMuscleLabel(label){
+      if(label === null || label === undefined) return "Full Body";
+      const raw = String(label).trim();
+      if(!raw) return "Full Body";
+      const normalized = MUSCLE_LABEL_NORMALIZATION[raw.toLowerCase()];
+      return normalized || "Full Body";
+    }
+
+    function buildMuscleTargets(exercisesOrMuscleNames){
+      if(!Array.isArray(exercisesOrMuscleNames) || exercisesOrMuscleNames.length === 0) return [];
+      const targets = new Set();
+      exercisesOrMuscleNames.forEach(item => {
+        if(typeof item === "string"){
+          targets.add(normalizeMuscleLabel(item));
+          return;
+        }
+        if(item && Array.isArray(item.muscles) && item.muscles.length){
+          item.muscles.forEach(m => targets.add(normalizeMuscleLabel(m)));
+          return;
+        }
+        targets.add(normalizeMuscleLabel(item?.muscle));
+      });
+      return MUSCLE_GROUP_ORDER.filter(group => targets.has(group));
+    }
+
+    function allRegionIdsForView(view){
+      const ids = [];
+      Object.keys(MUSCLE_REGION_MAP).forEach(group => {
+        if(group === "Full Body") return;
+        (MUSCLE_REGION_MAP[group][view] || []).forEach(id => ids.push(id));
+      });
+      return Array.from(new Set(ids));
+    }
+
+    function loadMuscleSvgMarkup(view){
+      const normalizedView = view === "back" ? "back" : "front";
+      if(muscleSvgMarkupCache.has(normalizedView)){
+        return muscleSvgMarkupCache.get(normalizedView);
+      }
+      const filePath = MUSCLE_SVG_FILES[normalizedView];
+      const request = fetch(filePath, { cache: "force-cache" }).then(resp => {
+        if(!resp.ok) throw new Error(`Failed to load ${filePath}`);
+        return resp.text();
+      });
+      muscleSvgMarkupCache.set(normalizedView, request);
+      return request;
+    }
+
+    function createMuscleSvgFigure(view, svgMarkup){
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgMarkup, "image/svg+xml");
+      const svgEl = doc.querySelector("svg");
+      if(!svgEl) throw new Error(`Invalid SVG for ${view}`);
+
+      svgEl.classList.add("muscle-figure");
+      svgEl.setAttribute("data-muscle-view", view);
+      svgEl.setAttribute("role", "img");
+      svgEl.setAttribute("aria-label", view === "back" ? "Back body muscle map" : "Front body muscle map");
+
+      svgEl.querySelectorAll("g.bodymap[id]").forEach(group => {
+        group.classList.add("muscle-region");
+      });
+
+      return svgEl;
+    }
+
+    function renderMusclePreview(container, targets, options = {}){
+      if(!container) return;
+      const template = document.getElementById("maleMuscleMapTemplate");
+      if(!template?.content?.firstElementChild){
+        container.innerHTML = `<div class="muted">Muscle map unavailable.</div>`;
+        return;
+      }
+
+      const normalizedTargets = Array.isArray(targets)
+        ? MUSCLE_GROUP_ORDER.filter(group => new Set(targets.map(normalizeMuscleLabel)).has(group))
+        : [];
+      const hasFullBody = normalizedTargets.includes("Full Body");
+      const previewEl = template.content.firstElementChild.cloneNode(true);
+      const emptyEl = previewEl.querySelector("[data-muscle-empty]");
+      const legend = previewEl.querySelector("[data-muscle-legend]");
+      const toolbar = previewEl.querySelector(".muscle-preview-toolbar");
+      const canvas = previewEl.querySelector("[data-muscle-canvas]");
+      const viewButtons = Array.from(previewEl.querySelectorAll("[data-muscle-view-btn]"));
+      if(canvas){
+        canvas.innerHTML = `<div class="muscle-preview-loading">Loading muscle map...</div>`;
+      }
+
+      legend.innerHTML = "";
+      if(normalizedTargets.length){
+        normalizedTargets.forEach(group => {
+          const chip = document.createElement("span");
+          chip.className = "muscle-legend-item";
+          chip.textContent = group;
+          chip.style.setProperty("--muscle-target-color", MUSCLE_COLOR_MAP[group] || MUSCLE_COLOR_MAP["Full Body"]);
+          legend.appendChild(chip);
+        });
+      }
+      if(options.hideLegend && legend){
+        legend.hidden = true;
+      }
+      if(options.hideToolbar && toolbar){
+        toolbar.hidden = true;
+      }
+
+      container.innerHTML = "";
+      container.appendChild(previewEl);
+      const renderId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      previewEl.dataset.renderId = renderId;
+
+      Promise.all([
+        loadMuscleSvgMarkup("front"),
+        loadMuscleSvgMarkup("back")
+      ]).then(([frontMarkup, backMarkup]) => {
+        if(previewEl.dataset.renderId !== renderId){
+          return;
+        }
+        if(!canvas){
+          return;
+        }
+
+        const frontFigure = createMuscleSvgFigure("front", frontMarkup);
+        const backFigure = createMuscleSvgFigure("back", backMarkup);
+        canvas.innerHTML = "";
+        canvas.appendChild(frontFigure);
+        canvas.appendChild(backFigure);
+        const figures = [frontFigure, backFigure];
+
+        const clearHighlights = () => {
+          previewEl.querySelectorAll("g.bodymap.muscle-region").forEach(region => {
+            region.classList.remove("is-targeted");
+            region.style.removeProperty("--muscle-target-color");
+            region.style.removeProperty("color");
+          });
+        };
+        const applyHighlight = (view, regionId, color) => {
+          previewEl.querySelectorAll(`svg[data-muscle-view="${view}"] g.bodymap#${regionId}`).forEach(region => {
+            region.classList.add("is-targeted");
+            region.style.setProperty("--muscle-target-color", color);
+            region.style.color = color;
+          });
+        };
+
+        clearHighlights();
+        if(normalizedTargets.length === 0){
+          if(emptyEl) emptyEl.hidden = false;
+        } else if(hasFullBody){
+          ["front", "back"].forEach(view => {
+            allRegionIdsForView(view).forEach(regionId => applyHighlight(view, regionId, MUSCLE_COLOR_MAP["Full Body"]));
+          });
+        } else {
+          normalizedTargets.forEach(group => {
+            const color = MUSCLE_COLOR_MAP[group] || MUSCLE_COLOR_MAP["Full Body"];
+            ["front", "back"].forEach(view => {
+              (MUSCLE_REGION_MAP[group]?.[view] || []).forEach(regionId => applyHighlight(view, regionId, color));
+            });
+          });
+        }
+
+        const setView = (view) => {
+          viewButtons.forEach(btn => {
+            const active = btn.getAttribute("data-muscle-view-btn") === view;
+            btn.classList.toggle("active", active);
+            btn.setAttribute("aria-pressed", String(active));
+          });
+          figures.forEach(figure => {
+            const active = figure.getAttribute("data-muscle-view") === view;
+            figure.classList.toggle("active", active);
+          });
+        };
+
+        viewButtons.forEach(btn => {
+          btn.addEventListener("click", () => setView(btn.getAttribute("data-muscle-view-btn")));
+        });
+        setView(options.defaultView === "back" ? "back" : "front");
+      }).catch(() => {
+        if(previewEl.dataset.renderId !== renderId){
+          return;
+        }
+        if(canvas){
+          canvas.innerHTML = `<div class="muted">Muscle map unavailable.</div>`;
+        }
+        if(emptyEl){
+          emptyEl.hidden = false;
+        }
+      });
+
+      const setView = (view) => {
+        viewButtons.forEach(btn => {
+          const active = btn.getAttribute("data-muscle-view-btn") === view;
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-pressed", String(active));
+        });
+      };
+      setView(options.defaultView === "back" ? "back" : "front");
+    }
+
 
     // ===== State =====
     let activeTab = "library"; // "library" | "workout" | "calendar"
@@ -288,6 +556,7 @@
     let userCustomExercises = [];
     let favoriteWorkoutIds = new Set();
     let favoritesOnly = false;
+    let exercisePreviewFocusReturnEl = null;
 
     // ===== Utilities =====
     function loadHistory(){
@@ -823,6 +1092,23 @@ function evaluateInlineCalc(raw){
       return Math.round(totalCalories);
     }
 
+    function calculateTemplateEstimatedCalories(exercises){
+      if(!Array.isArray(exercises) || exercises.length === 0) return 0;
+      const userWeight = loadUserWeight();
+      let totalCalories = 0;
+      exercises.forEach(ex => {
+        const met = ex?.met || 5;
+        const sets = Math.max(1, Number(ex?.defaultSets || 1));
+        let hoursPerSet = 1 / 60; // Default: 1 minute per set
+        if(ex?.name === "Plank" || ex?.trackingType === "time_distance"){
+          const defaultMinutes = Number(ex?.defaultTime || ex?.defaultMinutes || 1);
+          hoursPerSet = Math.max(defaultMinutes, 1) / 60;
+        }
+        totalCalories += met * userWeight * hoursPerSet * sets;
+      });
+      return Math.round(totalCalories);
+    }
+
     // BMR calculation using Harris-Benedict equation
     function calculateBMR(){
       const weight = loadUserWeight(); // kg
@@ -1067,25 +1353,17 @@ function evaluateInlineCalc(raw){
       const normalizedBlocks = normalizeTemplateBlocks(t);
       const previewExercises = normalizedBlocks.length ? flattenTemplateExercisesFromBlocks(normalizedBlocks) : (t.exercises || []);
 
-      // Calculate estimated calories for preview
-      const userWeight = loadUserWeight();
-      let estimatedCalories = 0;
-      previewExercises.forEach(ex => {
-        const met = ex.met || 5;
-        const sets = ex.defaultSets || 3;
-        // Assume 1 minute per set
-        estimatedCalories += met * userWeight * (sets / 60);
-      });
-      estimatedCalories = Math.round(estimatedCalories);
+      const estimatedCalories = calculateTemplateEstimatedCalories(previewExercises);
+      const lastPerformed = lastPerformedDate(t.name);
 
       const modal = document.createElement('div');
       modal.id = 'templatePreviewModal';
       modal.className = 'modal';
       modal.innerHTML = `
-        <div class="modal-content" role="dialog" aria-labelledby="templatePreviewTitle" style="max-width:640px">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
-            <h3 id="templatePreviewTitle" style="margin:0">${t.name}</h3>
-            <div style="display:flex; align-items:center; gap:8px">
+        <div class="modal-content template-preview-content" role="dialog" aria-labelledby="templatePreviewTitle">
+          <div class="template-preview-header">
+            <h3 id="templatePreviewTitle" class="template-preview-title">${t.name}</h3>
+            <div class="template-preview-actions">
               <button id="togglePreviewFavoriteBtn" class="icon-btn" title="${favorited ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${favorited ? 'Remove from favorites' : 'Add to favorites'}">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="${favorited ? '#fbbf24' : '#cbd5e1'}" aria-hidden="true"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
               </button>
@@ -1094,34 +1372,37 @@ function evaluateInlineCalc(raw){
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="#fca5a5" aria-hidden="true"><path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 </button>
               ` : ''}
+              <button id="closeTemplatePreview" class="icon-btn" aria-label="Close preview" title="Close preview">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M18.3 5.71 12 12l6.3 6.29-1.42 1.42L10.59 13.4 4.29 19.7 2.87 18.3 9.17 12l-6.3-6.29L4.29 4.3l6.3 6.3 6.29-6.3z"/></svg>
+              </button>
             </div>
           </div>
-          <div style="margin-top:8px; color:var(--muted)">Muscles: ${t.muscles.join(', ')} • Est. ${estimatedCalories} cal</div>
-          ${normalizedBlocks.length ? `
-            <div class="template-blocks-preview">
-              ${normalizedBlocks.map(block => `
-                <div class="template-block-item">
-                  <div style="font-weight:700">${block.id} ${blockTypeLabel(block.type)} x${block.rounds}</div>
-                  <div class="muted" style="font-size:12px; margin-top:3px">${block.exercises.map((ex, i) => `${block.id}${i + 1} ${ex.name}`).join(' • ')}</div>
-                </div>
-              `).join("")}
+          <div class="template-preview-subtitle muted">
+            Estimated: ${estimatedCalories} cal • ${lastPerformed ? `Last: ${fmtDate(lastPerformed)}` : "Not performed yet"}
+          </div>
+          <div class="template-preview-body">
+            <div>
+              <div id="templatePreviewMapHost"></div>
             </div>
-          ` : ``}
-          <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow:auto; padding-right:8px">
-            ${previewExercises.map(ex => `
-              <div style="display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2)">
-                <div style="width:36px; height:36px; border-radius:8px; background:var(--card); display:grid; place-items:center; font-weight:700; color:var(--text)">${(ex.name||'')[0] || '?'}</div>
-                <div style="flex:1">
-                  <div style="font-weight:700; color:var(--text)">${ex.name}</div>
-                  <div style="color:var(--muted); font-size:13px; margin-top:4px">${ex.muscle} • ${ex.defaultSets || ''} sets ${ex.defaultReps ? `• ${ex.defaultReps} reps` : ''}</div>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center">
-                    ${ex.exercise_link ? `<a href="${ex.exercise_link}" target="_blank" rel="noopener" class="icon-btn" style="width:32px;height:32px;border-radius:8px" aria-label="Open demo">
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3zM5 5h5v2H6v11h11v-4h2v6H5V5z"/></svg>
-                    </a>` : ''}
+            <div>
+              <h4 class="template-preview-section-title">Exercise List</h4>
+              <div class="template-preview-exercises">
+              ${previewExercises.map(ex => `
+                <div class="template-preview-exercise">
+                  <div class="template-preview-exercise-icon">${(ex.name||'')[0] || '?'}</div>
+                  <div style="flex:1">
+                    <div style="font-weight:700; color:var(--text)">${ex.name}</div>
+                    <div style="color:var(--muted); font-size:13px; margin-top:4px">${ex.muscle} • ${ex.defaultSets || ''} sets ${ex.defaultReps ? `• ${ex.defaultReps} reps` : ''}</div>
                   </div>
+                  <div style="display:flex; gap:8px; align-items:center">
+                      ${ex.exercise_link ? `<a href="${ex.exercise_link}" target="_blank" rel="noopener" class="icon-btn" style="width:32px;height:32px;border-radius:8px" aria-label="Open demo">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3zM5 5h5v2H6v11h11v-4h2v6H5V5z"/></svg>
+                      </a>` : ''}
+                    </div>
+                </div>
+              `).join('')}
               </div>
-            `).join('')}
+            </div>
           </div>
           <div class="modal-footer">
             <button id="startFromPreview" class="btn" data-start="${t.id}">Start Workout</button>
@@ -1130,6 +1411,7 @@ function evaluateInlineCalc(raw){
         </div>
       `;
       document.body.appendChild(modal);
+      renderMusclePreview(modal.querySelector("#templatePreviewMapHost"), buildMuscleTargets(previewExercises), { defaultView: "front" });
 
       // Wire up close and start actions
       modal.querySelectorAll('#closeTemplatePreview, #closePreviewFooter').forEach(btn=>{
@@ -1473,6 +1755,7 @@ function evaluateInlineCalc(raw){
             selectedStructuredExerciseRef = null;
             selectedExerciseIndex = Number(this.getAttribute('data-ex'));
           }
+          updateExerciseOptionsPreview();
           document.getElementById('exerciseOptionsModal').style.display = 'flex';
         });
       });
@@ -2145,6 +2428,7 @@ function evaluateInlineCalc(raw){
     function populateWorkoutDetailModal(record) {
       const modal = document.getElementById('workoutDetailModal');
       const titleEl = document.getElementById('workoutDetailTitle');
+      const bodyEl = document.getElementById('workoutDetailBody');
 
       // Set workout title in summary section
       titleEl.textContent = `${record.name} — ${fmtDate(record.dateKey)}`;
@@ -2163,6 +2447,13 @@ function evaluateInlineCalc(raw){
 
       // Show modal
       modal.style.display = 'flex';
+      if(bodyEl){
+        bodyEl.scrollTop = 0;
+      }
+      const modalContentEl = modal.querySelector('.modal-content');
+      if(modalContentEl){
+        modalContentEl.scrollTop = 0;
+      }
     }
 
     function populateWorkoutSummary(record) {
@@ -2214,6 +2505,12 @@ function evaluateInlineCalc(raw){
         safeUpdateElement('workoutCalories', `${record.calories || 0} cal`);
         safeUpdateElement('workoutTotalSets', totalSets);
         safeUpdateElement('workoutCompletedSets', `${completedSets}/${totalSets}`);
+
+        const mapHost = document.getElementById('workoutDetailMapHost');
+        if(mapHost){
+          const targets = collectRecordMuscleTargets(record);
+          renderMusclePreview(mapHost, targets, { defaultView: "front" });
+        }
       } catch (error) {
         console.error('Error populating workout summary:', error);
         // Fallback: try to populate with basic content
@@ -2223,6 +2520,10 @@ function evaluateInlineCalc(raw){
         safeUpdateElement('workoutCalories', `${record.calories || 0} cal`);
         safeUpdateElement('workoutTotalSets', totalSets || 0);
         safeUpdateElement('workoutCompletedSets', `${completedSets}/${totalSets}`);
+        const mapHost = document.getElementById('workoutDetailMapHost');
+        if(mapHost){
+          mapHost.innerHTML = '';
+        }
       }
     }
 
@@ -2615,6 +2916,74 @@ function evaluateInlineCalc(raw){
       return { ex, mode: "standard", exerciseIndex: selectedExerciseIndex };
     }
 
+    function updateExerciseOptionsPreview(){
+      const selected = getSelectedExerciseFromOptions();
+      const nameEl = document.getElementById("exerciseOptionsName");
+      const muscleEl = document.getElementById("exerciseOptionsMuscle");
+      const mapHost = document.getElementById("exerciseOptionsMapHost");
+      if(!nameEl || !muscleEl || !mapHost){
+        return;
+      }
+      if(!selected?.ex){
+        nameEl.textContent = "Exercise";
+        muscleEl.textContent = "Muscle Group";
+        mapHost.innerHTML = "";
+        return;
+      }
+      const ex = selected.ex;
+      nameEl.textContent = ex.name || "Exercise";
+      muscleEl.textContent = `Target: ${normalizeMuscleLabel(ex.muscle)}`;
+      renderMusclePreview(mapHost, buildMuscleTargets([ex]), {
+        defaultView: "front",
+        hideLegend: true
+      });
+    }
+
+    function closeExercisePreviewModal(){
+      const modal = document.getElementById("exercisePreviewModal");
+      if(!modal) return;
+      modal.style.display = "none";
+      const fallback = document.getElementById("tab-workout");
+      const target = (exercisePreviewFocusReturnEl && exercisePreviewFocusReturnEl.offsetParent !== null)
+        ? exercisePreviewFocusReturnEl
+        : fallback;
+      if(target && typeof target.focus === "function"){
+        target.focus();
+      }
+      exercisePreviewFocusReturnEl = null;
+    }
+
+    function showExercisePreviewModal(exercise, triggerEl = null){
+      const modal = document.getElementById("exercisePreviewModal");
+      if(!modal || !exercise) return;
+      const titleEl = document.getElementById("exercisePreviewTitle");
+      const metaEl = document.getElementById("exercisePreviewMeta");
+      const mapHost = document.getElementById("exercisePreviewMapHost");
+      const openDemoBtn = document.getElementById("openExerciseDemoBtn");
+      const modalContent = modal.querySelector(".modal-content");
+
+      exercisePreviewFocusReturnEl = triggerEl || document.activeElement;
+      if(titleEl) titleEl.textContent = exercise.name || "Exercise Preview";
+      if(metaEl) metaEl.textContent = `Primary target: ${normalizeMuscleLabel(exercise.muscle)}`;
+      renderMusclePreview(mapHost, buildMuscleTargets([exercise]), { defaultView: "front" });
+
+      if(openDemoBtn){
+        openDemoBtn.onclick = () => {
+          if(exercise.exercise_link && exercise.exercise_link !== "#"){
+            window.open(exercise.exercise_link, "_blank");
+          } else {
+            const query = encodeURIComponent((exercise.name || "exercise") + " exercise");
+            window.open(`https://www.google.com/search?q=${query}`, "_blank");
+          }
+        };
+      }
+
+      modal.style.display = "flex";
+      if(modalContent && typeof modalContent.focus === "function"){
+        modalContent.focus();
+      }
+    }
+
     // Generate custom workout
     async function generateCustomWorkout() {
       const description = document.getElementById('workoutDescription').value.trim();
@@ -2858,7 +3227,7 @@ Keep everything minimal and actionable.`;
 
         // Continue existing UX: show summary modal
         const calories = Number.isFinite(rec?.calories) ? rec.calories : (rec ? calculateWorkoutCalories({ exercises: rec.exercises }) : 0);
-        showWorkoutSummaryModal(result, calories);
+        showWorkoutSummaryModal(result, calories, rec);
         return true;
       } catch (error) {
         console.error('Error generating summary:', error);
@@ -2868,7 +3237,20 @@ Keep everything minimal and actionable.`;
       }
     }
 
-    function showWorkoutSummaryModal(result, calories) {
+    function collectRecordMuscleTargets(record){
+      if(!record) return [];
+      const direct = buildMuscleTargets(record.exercises || []);
+      if(direct.length) return direct;
+      const flattened = [];
+      (record.blocks || []).forEach(block => {
+        (block.roundEntries || []).forEach(round => {
+          (round.exercises || []).forEach(ex => flattened.push(ex));
+        });
+      });
+      return buildMuscleTargets(flattened);
+    }
+
+    function showWorkoutSummaryModal(result, calories, record = null) {
       const container = document.getElementById('summaryContent');
       // Clear any previous content
       container.innerHTML = '';
@@ -2909,79 +3291,143 @@ Keep everything minimal and actionable.`;
         return [];
       };
 
-      const root = document.createElement('ul');
+      const root = document.createElement('div');
+      root.className = 'summary-layout';
 
-      // Rating
-      if (typeof result.rating === 'string' && result.rating.trim()) {
-        const li = document.createElement('li');
-        li.textContent = `Rating: ${result.rating.trim()}`;
-        root.appendChild(li);
-      }
+      const topRow = document.createElement('div');
+      topRow.className = 'summary-row';
 
-      // Calories
-      if (Number.isFinite(calories)) {
-        const li = document.createElement('li');
-        li.textContent = `Calories Burned: ${calories} cal`;
-        root.appendChild(li);
+      const ratingCard = document.createElement('div');
+      ratingCard.className = 'summary-card';
+      const ratingLabel = document.createElement('div');
+      ratingLabel.className = 'summary-card-label';
+      ratingLabel.textContent = 'Session Rating';
+      const ratingValue = document.createElement('div');
+      ratingValue.className = 'summary-card-value';
+      ratingValue.textContent = (typeof result.rating === 'string' && result.rating.trim()) ? result.rating.trim() : 'N/A';
+      ratingCard.appendChild(ratingLabel);
+      ratingCard.appendChild(ratingValue);
+      topRow.appendChild(ratingCard);
+
+      const caloriesCard = document.createElement('div');
+      caloriesCard.className = 'summary-card';
+      const caloriesLabel = document.createElement('div');
+      caloriesLabel.className = 'summary-card-label';
+      caloriesLabel.textContent = 'Calories Burned';
+      const caloriesValue = document.createElement('div');
+      caloriesValue.className = 'summary-card-value';
+      caloriesValue.textContent = Number.isFinite(calories) ? `${calories} cal` : 'N/A';
+      caloriesCard.appendChild(caloriesLabel);
+      caloriesCard.appendChild(caloriesValue);
+      topRow.appendChild(caloriesCard);
+      root.appendChild(topRow);
+
+      const muscleTargets = collectRecordMuscleTargets(record);
+      let summaryMapHost = null;
+      if(muscleTargets.length){
+        const mapSection = document.createElement('section');
+        mapSection.className = 'summary-section';
+        const mapHeading = document.createElement('h4');
+        mapHeading.textContent = 'Targeted Muscle Map';
+        summaryMapHost = document.createElement('div');
+        summaryMapHost.className = 'summary-muscle-map-host';
+        mapSection.appendChild(mapHeading);
+        mapSection.appendChild(summaryMapHost);
+        root.appendChild(mapSection);
+
+        const muscleSection = document.createElement('div');
+        muscleSection.className = 'summary-section';
+        const heading = document.createElement('h4');
+        heading.textContent = 'Targeted Muscles';
+        const chips = document.createElement('div');
+        chips.className = 'summary-muscles';
+        muscleTargets.forEach(group => {
+          const chip = document.createElement('span');
+          chip.className = 'summary-muscle-chip';
+          chip.textContent = group;
+          chips.appendChild(chip);
+        });
+        muscleSection.appendChild(heading);
+        muscleSection.appendChild(chips);
+        root.appendChild(muscleSection);
       }
 
       // Key Metrics
       const metricsItems = splitSummaryTextToItems(result.keyMetrics);
       if (metricsItems.length > 0) {
-        const li = document.createElement('li');
-        li.textContent = 'Key Metrics:';
+        const section = document.createElement('section');
+        section.className = 'summary-section';
+        const heading = document.createElement('h4');
+        heading.textContent = 'Key Metrics';
         const ul = document.createElement('ul');
         metricsItems.forEach(m => {
           const mi = document.createElement('li');
           mi.textContent = m;
           ul.appendChild(mi);
         });
-        li.appendChild(ul);
-        root.appendChild(li);
+        section.appendChild(heading);
+        section.appendChild(ul);
+        root.appendChild(section);
       }
 
       // Comparison
       const comparisonItems = splitSummaryTextToItems(result.comparison, { bySentences: true });
       if (comparisonItems.length > 0) {
-        const li = document.createElement('li');
-        li.textContent = 'Comparison:';
+        const section = document.createElement('section');
+        section.className = 'summary-section';
+        const heading = document.createElement('h4');
+        heading.textContent = 'Comparison';
         const ul = document.createElement('ul');
         comparisonItems.forEach(c => {
           const ci = document.createElement('li');
           ci.textContent = c;
           ul.appendChild(ci);
         });
-        li.appendChild(ul);
-        root.appendChild(li);
+        section.appendChild(heading);
+        section.appendChild(ul);
+        root.appendChild(section);
       } else if (typeof result.comparison === 'string' && result.comparison.trim()) {
-        const li = document.createElement('li');
-        li.textContent = `Comparison: ${result.comparison.trim()}`;
-        root.appendChild(li);
+        const section = document.createElement('section');
+        section.className = 'summary-section';
+        const heading = document.createElement('h4');
+        heading.textContent = 'Comparison';
+        const p = document.createElement('div');
+        p.textContent = result.comparison.trim();
+        section.appendChild(heading);
+        section.appendChild(p);
+        root.appendChild(section);
       }
 
       // Tips
       const tipsItems = splitSummaryTextToItems(result.tips);
       if (tipsItems.length > 0) {
-        const li = document.createElement('li');
-        li.textContent = 'Tips:';
+        const section = document.createElement('section');
+        section.className = 'summary-section';
+        const heading = document.createElement('h4');
+        heading.textContent = 'Tips';
         const ul = document.createElement('ul');
         tipsItems.forEach(t => {
           const ti = document.createElement('li');
           ti.textContent = t;
           ul.appendChild(ti);
         });
-        li.appendChild(ul);
-        root.appendChild(li);
+        section.appendChild(heading);
+        section.appendChild(ul);
+        root.appendChild(section);
       }
 
       // If nothing was added, show a generic fallback
       if (!root.children.length) {
-        const li = document.createElement('li');
-        li.textContent = 'Summary unavailable.';
-        root.appendChild(li);
+        const fallback = document.createElement('div');
+        fallback.className = 'summary-section';
+        fallback.textContent = 'Summary unavailable.';
+        root.appendChild(fallback);
       }
 
       container.appendChild(root);
+      if(summaryMapHost){
+        renderMusclePreview(summaryMapHost, muscleTargets, { defaultView: "front" });
+      }
       document.getElementById('summaryModal').style.display = 'flex';
     }
 
@@ -3155,6 +3601,24 @@ Keep everything minimal and actionable.`;
         });
       }
 
+      const exercisePreviewModal = document.getElementById("exercisePreviewModal");
+      const closeExercisePreviewBtn = document.getElementById("closeExercisePreviewBtn");
+      if(closeExercisePreviewBtn){
+        closeExercisePreviewBtn.addEventListener("click", closeExercisePreviewModal);
+      }
+      if(exercisePreviewModal){
+        exercisePreviewModal.addEventListener("click", (e) => {
+          if(e.target === exercisePreviewModal){
+            closeExercisePreviewModal();
+          }
+        });
+      }
+      document.addEventListener("keydown", (e) => {
+        if(e.key === "Escape" && exercisePreviewModal?.style.display === "flex"){
+          closeExercisePreviewModal();
+        }
+      });
+
       // Exercise selector modal
       const exerciseChips = document.getElementById("exerciseChips");
       exerciseChips.addEventListener("click", (e) => {
@@ -3265,16 +3729,13 @@ Keep everything minimal and actionable.`;
       });
 
       // Exercise options modal
-      document.getElementById('previewExerciseBtn').addEventListener('click', () => {
+      document.getElementById('previewExerciseBtn').addEventListener('click', (e) => {
         const selected = getSelectedExerciseFromOptions();
         if (selected && activeWorkout) {
           const ex = selected.ex;
-          if (ex.exercise_link && ex.exercise_link !== '#') {
-            window.open(ex.exercise_link, '_blank');
-          } else {
-            const query = encodeURIComponent(ex.name + ' exercise');
-            window.open(`https://www.google.com/search?q=${query}`, '_blank');
-          }
+          document.getElementById('exerciseOptionsModal').style.display = 'none';
+          showExercisePreviewModal(ex, e.currentTarget);
+          return;
         }
         document.getElementById('exerciseOptionsModal').style.display = 'none';
       });
@@ -3346,7 +3807,20 @@ Keep everything minimal and actionable.`;
       });
     }
 
+    function moveOverlayModalsToBody(){
+      // Keep fixed-position overlays attached to body so parent panel/layout styles
+      // cannot create clipping or pseudo-viewport constraints on mobile.
+      const modalIds = ['workoutDetailModal'];
+      modalIds.forEach((id) => {
+        const modalEl = document.getElementById(id);
+        if(modalEl && modalEl.parentElement !== document.body){
+          document.body.appendChild(modalEl);
+        }
+      });
+    }
+
     function init(){
+       moveOverlayModalsToBody();
        breakDuration = loadBreakDuration();
        calendarCursor = new Date();
        favoriteWorkoutIds = new Set(loadFavoriteWorkoutIds());

@@ -163,6 +163,10 @@
                   <div class="summary-value" id="workoutCompletedSets">-</div>
                 </div>
               </div>
+              <div class="workout-muscle-map-section">
+                <h4 style="margin:0 0 12px 0; color:var(--text); font-size:16px; font-weight:700">Targeted Muscles</h4>
+                <div id="workoutDetailMapHost"></div>
+              </div>
             </div>
 
             <!-- AI Summary Section (if available) -->
@@ -349,13 +353,44 @@
   </div>
 
   <div id="exerciseOptionsModal" class="modal" style="display:none">
-    <div class="modal-content">
+    <div class="modal-content exercise-options-content">
       <h3>Exercise Options</h3>
+      <div class="exercise-options-preview">
+        <div id="exerciseOptionsName" class="exercise-options-name">Exercise</div>
+        <div id="exerciseOptionsMuscle" class="exercise-options-muscle">Muscle Group</div>
+        <div id="exerciseOptionsMapHost"></div>
+      </div>
       <div class="modal-footer">
         <button id="previewExerciseBtn" class="btn">Preview Exercise</button>
         <button id="replaceExerciseBtn" class="btn">Replace with Similar</button>
         <button id="removeExerciseBtn" class="btn secondary">Remove from Workout</button>
         <button id="cancelExerciseOptionsBtn" class="btn secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <template id="maleMuscleMapTemplate">
+    <div class="muscle-preview" data-muscle-preview-root>
+      <div class="muscle-preview-toolbar" role="tablist" aria-label="Body view">
+        <button type="button" class="muscle-view-btn active" data-muscle-view-btn="front" aria-pressed="true">Front</button>
+        <button type="button" class="muscle-view-btn" data-muscle-view-btn="back" aria-pressed="false">Back</button>
+      </div>
+      <div class="muscle-preview-canvas" data-muscle-canvas>
+        <div class="muscle-preview-loading">Loading muscle map...</div>
+      </div>
+      <div class="muscle-legend" data-muscle-legend></div>
+      <div class="muscle-empty" data-muscle-empty hidden>No mapped muscle data for this selection.</div>
+    </div>
+  </template>
+
+  <div id="exercisePreviewModal" class="modal" style="display:none">
+    <div class="modal-content exercise-preview-content" role="dialog" aria-labelledby="exercisePreviewTitle" tabindex="-1">
+      <h3 id="exercisePreviewTitle">Exercise Preview</h3>
+      <div id="exercisePreviewMeta" class="muscle-preview-meta"></div>
+      <div id="exercisePreviewMapHost"></div>
+      <div class="modal-footer">
+        <button id="openExerciseDemoBtn" class="btn">Open Demo</button>
+        <button id="closeExercisePreviewBtn" class="btn secondary">Close</button>
       </div>
     </div>
   </div>
@@ -443,3 +478,4 @@
   <script type="module" src="js/script.js"></script>
 </body>
 </html>
+

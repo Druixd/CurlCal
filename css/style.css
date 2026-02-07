@@ -19,6 +19,15 @@
   /* ring-cyan-400/40 */
   --text-secondary: rgba(241, 245, 249, 0.8);
   --muted: rgba(241, 245, 249, 0.6);
+  --muscle-outline: rgba(241, 245, 249, 0.35);
+  --muscle-idle-fill: transparent;
+  --muscle-chest: #ff6f79;
+  --muscle-back: #35d6c8;
+  --muscle-shoulders: #ff9f6e;
+  --muscle-arms: #7ec8ff;
+  --muscle-legs: #a9d96f;
+  --muscle-core: #ffd36e;
+  --muscle-full-body: #d68bff;
 
   /* Legacy aliases kept for existing markup */
   --panel: var(--card);
@@ -693,6 +702,345 @@ header.app-header {
   padding: 8px 10px;
 }
 
+.template-preview-content {
+  max-width: 720px !important;
+  width: min(92vw, 780px);
+  max-height: 90vh !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 20px 0 !important;
+}
+
+.template-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: visible;
+  padding-bottom: 0;
+  margin-top: 12px;
+}
+
+.template-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.template-preview-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.template-preview-subtitle {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.template-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-preview-stats {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+}
+
+.template-preview-stat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.template-preview-stat-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.template-preview-stat-value {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.template-preview-muscles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.template-preview-section-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.template-preview-exercises {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.template-preview-exercise {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.template-preview-exercise-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.summary-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  padding: 10px 12px;
+}
+
+.summary-card-label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.summary-card-value {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.summary-muscles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.summary-muscle-chip {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(156, 228, 25, 0.12);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.summary-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  padding: 10px 12px;
+}
+
+.summary-section h4 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.summary-section ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-secondary);
+}
+
+.summary-section li + li {
+  margin-top: 4px;
+}
+
+.summary-muscle-map-host,
+#workoutDetailMapHost {
+  margin-top: 6px;
+}
+
+.summary-muscle-map-host .muscle-preview,
+#workoutDetailMapHost .muscle-preview {
+  padding: 10px;
+}
+
+.summary-muscle-map-host .muscle-preview-canvas,
+#workoutDetailMapHost .muscle-preview-canvas {
+  min-height: 220px;
+}
+
+.summary-muscle-map-host .muscle-figure,
+#workoutDetailMapHost .muscle-figure {
+  max-height: 260px;
+}
+
+.workout-muscle-map-section {
+  margin-top: 16px;
+}
+
+.muscle-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.muscle-preview-toolbar {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.muscle-view-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.muscle-view-btn.active {
+  background: rgba(156, 228, 25, 0.16);
+  color: var(--text);
+}
+
+.muscle-preview-canvas {
+  min-height: clamp(280px, 34vh, 420px);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: radial-gradient(circle at 50% 0%, rgba(156, 228, 25, 0.06), transparent 62%), var(--panel);
+  display: grid;
+  place-items: center;
+  padding: 10px;
+}
+
+.muscle-figure {
+  width: min(100%, 380px);
+  max-height: min(40vh, 450px);
+  height: auto;
+  display: none;
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+  image-rendering: auto;
+}
+
+.muscle-figure.active {
+  display: block;
+}
+
+.muscle-figure .hidden {
+  display: none !important;
+}
+
+.muscle-figure [stroke] {
+  stroke: rgba(241, 245, 249, 0.95) !important;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+}
+
+.muscle-region {
+  color: var(--muscle-idle-fill);
+  transition: color 180ms ease, opacity 180ms ease;
+}
+
+.muscle-region.is-targeted {
+  color: var(--muscle-target-color, var(--muscle-full-body));
+}
+
+.muscle-legend {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.muscle-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.muscle-legend-item::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muscle-target-color, var(--muscle-full-body));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.muscle-empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.muscle-preview-loading {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.muscle-preview-meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.exercise-preview-content {
+  max-width: 580px;
+}
+
 .exercise .row {
   display: flex;
   align-items: center;
@@ -1084,6 +1432,46 @@ header.app-header {
   align-items: stretch;
 }
 
+#exerciseOptionsModal .modal-content.exercise-options-content {
+  max-width: 460px;
+}
+
+.exercise-options-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  padding: 10px;
+}
+
+.exercise-options-name {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.exercise-options-muscle {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+#exerciseOptionsMapHost {
+  margin-top: 8px;
+}
+
+#exerciseOptionsMapHost .muscle-preview {
+  padding: 8px;
+  background: var(--panel);
+}
+
+#exerciseOptionsMapHost .muscle-preview-canvas {
+  min-height: 170px;
+}
+
+#exerciseOptionsMapHost .muscle-figure {
+  max-height: 190px;
+}
+
 .modal-content {
   background: var(--card);
   padding: 20px;
@@ -1133,6 +1521,16 @@ header.app-header {
   min-height: 0;
 }
 
+#templatePreviewModal .template-preview-content > *:not(.modal-footer) {
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
+#templatePreviewModal .template-preview-body {
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
 /* Workout Detail Modal Content Constraints */
 #workoutDetailModal .modal-content {
   max-height: 80vh;
@@ -1153,6 +1551,46 @@ header.app-header {
   margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+#templatePreviewModal .modal-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin-top: 8px;
+  margin-left: -20px;
+  margin-right: -20px;
+  margin-bottom: 0;
+  padding: 12px 20px;
+  justify-content: center;
+  gap: 10px;
+  border-top: 0;
+  background: var(--card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+#templatePreviewModal .muscle-preview {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+#templatePreviewModal .muscle-preview-canvas {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: clamp(260px, 34vh, 420px);
+}
+
+#templatePreviewModal .muscle-legend {
+  margin-top: 4px;
+}
+
+#templatePreviewModal .modal-footer .btn {
+  border-radius: 999px;
+  min-width: 118px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
 }
 
 /* Floating Resume */
@@ -1967,5 +2405,171 @@ header.app-header {
   #workoutDetailModal .modal-content>div:not(.modal-footer) {
     padding-bottom: 20px;
     margin-bottom: 20px;
+  }
+
+  .muscle-preview-canvas {
+    min-height: 210px;
+    padding: 8px;
+  }
+
+  .muscle-figure {
+    max-height: 220px;
+  }
+
+  #exerciseOptionsMapHost .muscle-preview-canvas {
+    min-height: 150px;
+  }
+
+  #exerciseOptionsMapHost .muscle-figure {
+    max-height: 170px;
+  }
+
+  .template-preview-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .template-preview-content {
+    width: 100%;
+    max-height: 88vh !important;
+    min-height: 0;
+    padding: 16px 16px 0 !important;
+  }
+
+  #templatePreviewModal .modal-footer {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .template-preview-title {
+    font-size: 24px;
+  }
+
+  .muscle-preview-canvas {
+    min-height: 240px;
+  }
+
+  .muscle-figure {
+    max-height: 300px;
+  }
+}
+
+/* Calendar Workout Detail Modal: spacing model aligned with library popup */
+#workoutDetailModal {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: max(12px, env(safe-area-inset-top)) 20px max(12px, env(safe-area-inset-bottom)) !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+#workoutDetailModal .modal-content {
+  width: min(92vw, 780px) !important;
+  max-width: min(92vw, 780px) !important;
+  max-height: calc(100vh - 40px) !important;
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  min-height: 0 !important;
+  padding: 20px !important;
+  border-radius: var(--radius) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  overflow: hidden !important;
+}
+
+#workoutDetailModal .modal-content > *:not(.modal-footer) {
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
+#workoutDetailModal #workoutDetailBody {
+  margin-top: 0 !important;
+  max-height: none !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  padding-right: 2px;
+  padding-bottom: 8px;
+  gap: 12px !important;
+}
+
+#workoutDetailModal .workout-summary-section,
+#workoutDetailModal .ai-summary-section,
+#workoutDetailModal .exercise-breakdown-section {
+  margin: 0 !important;
+  padding: 14px !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+#workoutDetailModal .summary-grid {
+  gap: 10px !important;
+  margin-top: 10px !important;
+}
+
+#workoutDetailModal .modal-footer {
+  position: static !important;
+  margin: 0 !important;
+  padding: 10px 0 0 !important;
+  border-top: 1px solid var(--border) !important;
+  background: transparent !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  z-index: auto !important;
+}
+
+#workoutDetailModal #workoutDetailMapHost .muscle-preview {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+#workoutDetailModal #workoutDetailMapHost .muscle-preview-canvas {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-height: clamp(260px, 36vh, 440px);
+}
+
+#workoutDetailModal #workoutDetailMapHost .muscle-legend {
+  margin-top: 6px;
+}
+
+@media (max-width: 767px) {
+  #workoutDetailModal {
+    padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)) !important;
+  }
+
+  #workoutDetailModal .modal-content {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: calc(100vh - 32px) !important;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    min-height: 0 !important;
+    padding: 16px !important;
+    gap: 10px !important;
+  }
+
+  #workoutDetailModal #workoutDetailBody {
+    padding-bottom: 6px;
+    gap: 10px !important;
+  }
+
+  #workoutDetailModal .workout-summary-section,
+  #workoutDetailModal .ai-summary-section,
+  #workoutDetailModal .exercise-breakdown-section {
+    padding: 12px !important;
+  }
+
+  #workoutDetailModal .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
   }
 }
